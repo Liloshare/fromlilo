@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tools.fromlilo.com</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">fromlilo tools</p>
+          <h1>업무 자동화 툴</h1>
+        </div>
+        <div class="status" id="authStatus">로그인 필요</div>
+      </header>
+
+      <section class="tool-grid" aria-label="업무 자동화 툴 목록">
+        <button class="tool-card" id="qcToolButton" type="button">
+          <span class="tool-icon">✓</span>
+          <span>
+            <strong>조선 검수 툴</strong>
+            <small>이미지와 라벨 데이터를 빠르게 확인합니다.</small>
+          </span>
+        </button>
+
+        <button class="tool-card muted" type="button" disabled>
+          <span class="tool-icon">+</span>
+          <span>
+            <strong>다음 자동화 툴</strong>
+            <small>준비 중</small>
+          </span>
+        </button>
+      </section>
+
+      <section class="workspace locked" id="workspace">
+        <div>
+          <p class="eyebrow">Shipbuilding QC</p>
+          <h2>조선 검수 툴</h2>
+          <p id="workspaceText">소개 화면을 확인한 뒤 로그인하면 툴이 활성화됩니다.</p>
+        </div>
+        <div class="workspace-actions">
+          <button class="primary" id="startToolButton" type="button" disabled>검수 시작</button>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal-backdrop hidden" id="introModal" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+      <section class="modal intro-modal">
+        <button class="close-button" id="closeIntroButton" type="button" aria-label="소개 닫기">×</button>
+        <div class="carousel">
+          <div class="gif-panel" id="gifPanel">
+            <div class="scan-line"></div>
+            <div class="bbox one"></div>
+            <div class="bbox two"></div>
+            <div class="bbox three"></div>
+          </div>
+          <div class="intro-copy">
+            <p class="eyebrow">Tool Guide</p>
+            <h2 id="introTitle">조선 검수 툴 사용 흐름</h2>
+            <p id="introText">이미지와 라벨 파일을 업로드하고, 클래스와 박스 오류를 한 화면에서 확인합니다.</p>
+            <div class="dots" aria-hidden="true">
+              <span class="dot active"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-backdrop hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+      <form class="modal login-modal" id="loginForm">
+        <h2 id="loginTitle">로그인</h2>
+        <label>
+          이메일
+          <input type="email" name="email" placeholder="name@company.com" required />
+        </label>
+        <label>
+          비밀번호
+          <input type="password" name="password" placeholder="••••••••" required />
+        </label>
+        <button class="primary" type="submit">로그인</button>
+      </form>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
