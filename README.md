@@ -1,6 +1,6 @@
-# 업무자동화 툴
+# Automation Tools
 
-반복 검수, 파일 확인, 납품 전 점검을 위한 업무자동화 도구 모음입니다.
+QC / Review / File Check / Delivery Prep
 
 ## Tools
 
