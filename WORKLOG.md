@@ -6,6 +6,8 @@
 - Added the first tool: `tools/joseon-bbox-qc/index.html`.
 - Added a root tool index page.
 - Added project handoff docs for multi-computer Codex sessions.
+- Renamed the public site title to `업무자동화 툴`.
+- Restyled the root page with a Tally-inspired single-column layout.
 
 ## Next Session Notes
 

@@ -3,16 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Data QC</title>
+  <title>업무자동화 툴</title>
   <style>
     :root {
-      --bg: #f4f5f7;
-      --panel: #ffffff;
-      --text: #202534;
-      --muted: #697386;
-      --line: #dfe3ea;
-      --accent: #2563eb;
-      --accent-soft: #eaf1ff;
+      --bg: #ffffff;
+      --text: #171717;
+      --muted: #6f6f6f;
+      --line: #e8e8e8;
+      --soft: #f7f7f7;
+      --accent: #111111;
       --radius: 8px;
     }
 
@@ -27,102 +26,134 @@
     }
 
     main {
-      width: min(1040px, calc(100% - 32px));
+      width: min(720px, calc(100% - 36px));
       margin: 0 auto;
-      padding: 32px 0 56px;
+      padding: 36px 0 72px;
+    }
+
+    .cover {
+      width: 100%;
+      aspect-ratio: 2.9 / 1;
+      border-radius: var(--radius);
+      background:
+        linear-gradient(90deg, rgba(0,0,0,0.28), rgba(0,0,0,0.04)),
+        url("https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1400&q=80") center / cover;
+      margin-bottom: 42px;
     }
 
     header {
-      display: flex;
-      align-items: end;
-      justify-content: space-between;
-      gap: 20px;
-      margin-bottom: 18px;
+      margin-bottom: 34px;
     }
 
     h1 {
       margin: 0;
-      font-size: 24px;
-      line-height: 1.2;
+      font-size: 42px;
+      line-height: 1.12;
       letter-spacing: 0;
+      font-weight: 800;
     }
 
     .subtitle {
-      margin: 6px 0 0;
+      margin: 14px 0 0;
       color: var(--muted);
-      font-size: 14px;
+      font-size: 17px;
+      line-height: 1.7;
     }
 
-    .tool-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 12px;
+    .divider {
+      height: 1px;
+      background: var(--line);
+      margin: 0 0 32px;
     }
 
-    .tool-card {
+    .tool-list {
       display: grid;
-      gap: 12px;
-      min-height: 168px;
-      padding: 18px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
+      gap: 22px;
+    }
+
+    .tool-link {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+      padding: 2px 0 23px;
+      border-bottom: 1px solid var(--line);
       color: inherit;
       text-decoration: none;
-      box-shadow: 0 1px 2px rgba(20, 30, 50, 0.04);
     }
 
-    .tool-card:hover {
-      border-color: rgba(37, 99, 235, 0.35);
-      box-shadow: 0 8px 24px rgba(20, 30, 50, 0.08);
+    .tool-link:hover .tool-title {
+      text-decoration: underline;
+      text-underline-offset: 4px;
     }
 
     .tool-kicker {
-      color: var(--accent);
-      font-size: 12px;
+      color: var(--muted);
+      font-size: 13px;
       font-weight: 800;
+      margin-bottom: 8px;
     }
 
     .tool-title {
       margin: 0;
-      font-size: 18px;
-      line-height: 1.25;
+      font-size: 22px;
+      line-height: 1.35;
+      font-weight: 750;
     }
 
     .tool-desc {
-      margin: 0;
+      margin: 9px 0 0;
       color: var(--muted);
-      font-size: 13px;
-      line-height: 1.55;
+      font-size: 15px;
+      line-height: 1.65;
     }
 
-    .tool-status {
-      width: fit-content;
-      align-self: end;
-      padding: 5px 9px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-size: 12px;
+    .open-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 76px;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--soft);
+      color: var(--text);
+      font-size: 13px;
       font-weight: 800;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 560px) {
+      main { width: min(100% - 28px, 720px); padding-top: 20px; }
+      .cover { aspect-ratio: 1.9 / 1; margin-bottom: 32px; }
+      h1 { font-size: 34px; }
+      .subtitle { font-size: 15px; }
+      .tool-link { grid-template-columns: 1fr; gap: 12px; }
+      .open-button { width: 100%; }
     }
   </style>
 </head>
 <body>
   <main>
+    <div class="cover" aria-hidden="true"></div>
+
     <header>
       <div>
-        <h1>Data QC</h1>
-        <p class="subtitle">데이터 검수 자동화 도구 모음</p>
+        <h1>업무자동화 툴</h1>
+        <p class="subtitle">반복 검수, 파일 확인, 납품 전 점검을 조금 더 빠르고 일관되게 처리하기 위한 도구들을 모아둔 공간입니다.</p>
       </div>
     </header>
 
-    <section class="tool-grid" aria-label="자동화 도구 목록">
-      <a class="tool-card" href="./tools/joseon-bbox-qc/">
-        <div class="tool-kicker">Bounding Box QC</div>
-        <h2 class="tool-title">조선 BBox QC Tool</h2>
-        <p class="tool-desc">원본 이미지 폴더와 YOLO 라벨 폴더를 비교해 매칭, 박스 수, 중복 파일명, 오류 메모를 검수합니다.</p>
-        <span class="tool-status">Local file mode</span>
+    <div class="divider"></div>
+
+    <section class="tool-list" aria-label="자동화 도구 목록">
+      <a class="tool-link" href="./tools/joseon-bbox-qc/">
+        <div>
+          <div class="tool-kicker">Bounding Box QC</div>
+          <h2 class="tool-title">조선 BBox QC Tool</h2>
+          <p class="tool-desc">원본 이미지 폴더와 YOLO 라벨 폴더를 비교해 매칭, 박스 수, 중복 파일명, 오류 메모를 검수합니다.</p>
+        </div>
+        <span class="open-button">열기</span>
       </a>
     </section>
   </main>
