@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Quality QC Tools</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --panel: #ffffff;
+      --text: #202534;
+      --muted: #697386;
+      --line: #dfe3ea;
+      --accent: #2563eb;
+      --accent-soft: #eaf1ff;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
+    }
+
+    main {
+      width: min(1040px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .tool-card {
+      display: grid;
+      gap: 12px;
+      min-height: 168px;
+      padding: 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: inherit;
+      text-decoration: none;
+      box-shadow: 0 1px 2px rgba(20, 30, 50, 0.04);
+    }
+
+    .tool-card:hover {
+      border-color: rgba(37, 99, 235, 0.35);
+      box-shadow: 0 8px 24px rgba(20, 30, 50, 0.08);
+    }
+
+    .tool-kicker {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .tool-title {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .tool-desc {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .tool-status {
+      width: fit-content;
+      align-self: end;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Data Quality QC Tools</h1>
+        <p class="subtitle">데이터 검수와 납품 전 확인을 위한 자동화 도구 모음</p>
+      </div>
+    </header>
+
+    <section class="tool-grid" aria-label="자동화 도구 목록">
+      <a class="tool-card" href="./tools/joseon-bbox-qc/">
+        <div class="tool-kicker">Bounding Box QC</div>
+        <h2 class="tool-title">조선 BBox QC Tool</h2>
+        <p class="tool-desc">원본 이미지 폴더와 YOLO 라벨 폴더를 비교해 매칭, 박스 수, 중복 파일명, 오류 메모를 검수합니다.</p>
+        <span class="tool-status">Local file mode</span>
+      </a>
+    </section>
+  </main>
+</body>
+</html>
