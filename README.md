@@ -1,6 +1,6 @@
-# Data Quality QC Tools
+# Data QC
 
-데이터 검수와 납품 전 확인을 위한 자동화 도구 모음입니다.
+데이터 검수 자동화 도구 모음입니다.
 
 ## Tools
 
@@ -21,8 +21,8 @@ open index.html
 다른 컴퓨터에서 이어서 작업할 때:
 
 ```bash
-git clone https://github.com/Liloshare/data-quality-qc-tools.git
-cd data-quality-qc-tools
+git clone https://github.com/Liloshare/data-qc.git
+cd data-qc
 ```
 
 작업 시작 전:
@@ -47,4 +47,3 @@ git push
 ```text
 README.md, WORKLOG.md, TODO.md 읽고 이어서 작업해줘.
 ```
-
