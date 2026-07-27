@@ -8,6 +8,7 @@
 - Added project handoff docs for multi-computer Codex sessions.
 - Renamed the public site title to `업무자동화 툴`.
 - Restyled the root page with a Tally-inspired single-column layout.
+- Revised the root page to a dark, typewriter-style layout.
 
 ## Next Session Notes
 
