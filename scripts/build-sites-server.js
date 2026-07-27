@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -10,11 +10,22 @@ mkdirSync(serverDir, { recursive: true });
 mkdirSync(hostingDir, { recursive: true });
 copyFileSync(join(root, ".openai", "hosting.json"), join(hostingDir, "hosting.json"));
 
+const assetsDir = join(dist, "assets");
+const assets = Object.fromEntries(
+  readdirSync(assetsDir).map((file) => [
+    `/assets/${file}`,
+    readFileSync(join(assetsDir, file), "utf8")
+  ])
+);
+const indexHtml = readFileSync(join(dist, "index.html"), "utf8");
+
 writeFileSync(
   join(serverDir, "index.js"),
-  `import manifest from "__STATIC_CONTENT_MANIFEST";
-
-const assetManifest = JSON.parse(manifest);
+  `const files = ${JSON.stringify({
+    "/index.html": indexHtml,
+    "/": indexHtml,
+    ...assets
+  })};
 
 function contentType(pathname) {
   if (pathname.endsWith(".html")) return "text/html; charset=utf-8";
@@ -28,11 +39,9 @@ function contentType(pathname) {
   return "application/octet-stream";
 }
 
-async function serveAsset(env, pathname) {
-  const key = assetManifest[pathname.slice(1)] || assetManifest[pathname];
-  if (!key) return null;
-  const body = await env.__STATIC_CONTENT.get(key, "arrayBuffer");
-  if (!body) return null;
+function serveAsset(pathname) {
+  const body = files[pathname] || files["/index.html"];
+  if (!body) return new Response("Not found", { status: 404 });
   return new Response(body, {
     headers: {
       "content-type": contentType(pathname),
@@ -44,12 +53,10 @@ async function serveAsset(env, pathname) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request) {
     const url = new URL(request.url);
     const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
-    return (await serveAsset(env, pathname))
-      || (await serveAsset(env, "/index.html"))
-      || new Response("Not found", { status: 404 });
+    return serveAsset(pathname);
   }
 };
 `
