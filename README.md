@@ -1,49 +1,37 @@
-# Automation Tools
+# fromlilo.com
 
-QC / Review / File Check / Delivery Prep
+fromlilo.com site workspace.
 
-## Tools
+## Structure
 
-- `tools/joseon-bbox-qc/`: 조선 BBox QC Tool
-  - 현재 방식: 브라우저에서 로컬 이미지 폴더와 YOLO 라벨 폴더를 선택해 검수
-  - 다음 목표: Cloudflare R2/D1/Worker 기반으로 온라인 데이터 불러오기와 검수 결과 저장 지원
+- `ai-services/`: AI generated service pages
+- `automation-tools/`: Work automation tool pages
+- `shop/`: Shopping mall pages
 
-## Local Preview
+## Page Ideas
 
-정적 HTML 도구라서 루트 `index.html`을 브라우저로 열면 됩니다.
+### AI Services
 
-```bash
-open index.html
-```
+- Actor profile builder
+- Resume builder
 
-## Git Workflow
+### Automation Tools
 
-다른 컴퓨터에서 이어서 작업할 때:
+- Shipbuilding QC tool
 
-```bash
-git clone https://github.com/Liloshare/data-qc.git
-cd data-qc
-```
+### Shop
 
-작업 시작 전:
+- Shopping mall
 
-```bash
-git pull
-```
+## Upload Notes
 
-작업 종료 후:
+Put each page or service in its own folder.
 
-```bash
-git status
-git add .
-git commit -m "Update tools"
-git push
-```
-
-## Codex Handoff
-
-새 세션이나 다른 컴퓨터에서 Codex에게 먼저 요청할 것:
+Example:
 
 ```text
-README.md, WORKLOG.md, TODO.md 읽고 이어서 작업해줘.
+ai-services/actor-profile/
+ai-services/resume-builder/
+automation-tools/shipbuilding-qc/
+shop/
 ```
