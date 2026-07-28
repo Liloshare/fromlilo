@@ -585,6 +585,11 @@
       color: #050505;
       background: #f3f0e8;
     }
+    .box-row button {
+      min-height: 24px;
+      padding: 3px 7px;
+      font-size: 11px;
+    }
 
     .issues-list {
       display: grid;
@@ -619,6 +624,15 @@
       height: 26px;
       padding: 0;
       line-height: 1;
+    }
+
+    .issue-inline-select {
+      grid-column: 1 / -1;
+      display: grid;
+      gap: 5px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      background: var(--soft);
     }
 
     .hint {
@@ -836,6 +850,12 @@
       box-shadow: 0 0 18px rgba(243, 240, 232, 0.08);
     }
 
+    .class-preset-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+    }
+
     #classInput {
       display: none;
     }
@@ -944,6 +964,13 @@
             <span id="classSummary">15 CLASS</span>
             <button type="button" onclick="openClassEditor()">EDIT</button>
           </div>
+          <div class="class-preset-row">
+            <select id="classPresetSelect">
+              <option value="">PROJECT CLASS</option>
+              <option value="ship_task1">ship task1</option>
+            </select>
+            <button type="button" onclick="applyClassPreset()">LOAD</button>
+          </div>
           <textarea id="classInput"></textarea>
           <div class="hint">OBJ.NAMES / CLASS LIST</div>
         </div>
@@ -1020,10 +1047,10 @@
             <div class="field">
               <label>ISSUE</label>
               <div class="check-grid" id="issueChecks"></div>
-            </div>
-            <div class="field" id="missingClassField">
-              <label>MISSING</label>
-              <select id="missingClassSelect" onchange="updateCurrentIssue()"></select>
+              <div class="issue-inline-select hidden" id="missingClassField">
+                <label>ACTION CLASS</label>
+                <select id="missingClassSelect" onchange="updateCurrentIssue()"></select>
+              </div>
             </div>
             <div class="field">
               <label>NOTE</label>
@@ -1098,6 +1125,25 @@
 <script>
 const PAGE_LIMIT = 1000;
 const DEFAULT_COLORS = ['#f2867a','#6f9ce0','#5fb3a3','#f0b45c','#a685e8','#e87aa8','#6cbf7f','#5fb8cc','#ef9a5c','#8b85e8','#b3d967','#cc7070','#6ecfbe','#f5d76e','#9aa3b8'];
+const CLASS_PRESETS = {
+  ship_task1: [
+    'burnt',
+    'oil',
+    'blowhole',
+    'spatter',
+    'scratch',
+    'dent',
+    'crack',
+    'rust',
+    'slag',
+    'undercut',
+    'overlap',
+    'pit',
+    'contamination',
+    'deformation',
+    'etc'
+  ]
+};
 const ISSUE_TYPES = [
   ['wrong_class', 'WRONG CLASS'],
   ['wrong_box', 'SIZE'],
@@ -1124,6 +1170,7 @@ let reviewedSet = new Set();
 let objectUrlCache = new Map();
 let activeBoxIndex = -1;
 let issueTarget = null;
+let selectedBoxIndices = new Set();
 
 // review-mode ("하나씩 넘기기") navigation queue, snapshot of the filtered list at the
 // moment review mode was entered so marking a record OK/issue doesn't yank it out from
@@ -1234,6 +1281,7 @@ function setRecordIssues(record, issues) {
 
 function targetKey(target) {
   if (!target) return 'image';
+  if (target.type === 'boxes') return `boxes:${target.boxIndices.join(',')}`;
   if (target.type === 'box') return `box:${target.boxIndex}`;
   if (target.type === 'class') return `class:${target.className}`;
   return target.type || 'image';
@@ -1241,6 +1289,7 @@ function targetKey(target) {
 
 function targetLabel(target) {
   if (!target) return 'IMAGE';
+  if (target.type === 'boxes') return `BOX ${target.boxIndices.map(idx => idx + 1).join(', ')}`;
   if (target.type === 'box') return `BOX ${target.boxIndex + 1}`;
   if (target.type === 'class') return `CLASS ${target.className}`;
   return 'IMAGE';
@@ -1282,6 +1331,17 @@ document.getElementById('classInput').addEventListener('input', () => {
   renderCurrent();
 });
 document.getElementById('missingClassSelect').addEventListener('change', updateCurrentIssue);
+
+function applyClassPreset() {
+  const key = document.getElementById('classPresetSelect').value;
+  const preset = CLASS_PRESETS[key];
+  if (!preset) return;
+  document.getElementById('classInput').value = preset.join('\n');
+  readClassInput();
+  renderClassControls();
+  updateClassSummary();
+  renderCurrent();
+}
 
 function normalizedStem(name) {
   return name.replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, '').normalize('NFC').toLowerCase();
@@ -1472,6 +1532,7 @@ async function runValidation() {
   labelMap = new Map();
   activeBoxIndex = -1;
   issueTarget = null;
+  selectedBoxIndices.clear();
   mainImageCache = new Map();
   thumbBitmapCache = new Map();
   showLoading('MATCHING');
@@ -1996,6 +2057,7 @@ function selectRecord(index) {
   currentIndex = index;
   activeBoxIndex = -1;
   issueTarget = null;
+  selectedBoxIndices.clear();
   loadIssueToForm();
   renderIssuesList();
   updateGalleryHighlights();
@@ -2124,26 +2186,23 @@ async function renderCurrent() {
       btn.type = 'button';
       btn.textContent = String(idx + 1);
       btn.title = `${idx + 1}. ${className}`;
-      btn.classList.toggle('active', idx === activeBoxIndex);
-      btn.addEventListener('click', () => {
+      btn.classList.toggle('active', selectedBoxIndices.has(idx));
+      btn.addEventListener('mouseenter', () => {
         activeBoxIndex = idx;
-        issueTarget = { type: 'box', boxIndex: idx, className };
-        loadIssueToForm();
+        renderCanvas(document.getElementById('mainCanvas'), record, 1200, true);
+      });
+      btn.addEventListener('mouseleave', () => {
+        activeBoxIndex = -1;
+        renderCanvas(document.getElementById('mainCanvas'), record, 1200, true);
+      });
+      btn.addEventListener('click', () => {
+        if (selectedBoxIndices.has(idx)) selectedBoxIndices.delete(idx);
+        else selectedBoxIndices.add(idx);
+        issueTarget = null;
         renderCurrent();
       });
       actions.appendChild(btn);
     });
-    const err = document.createElement('button');
-    err.type = 'button';
-    err.textContent = 'ERR';
-    err.addEventListener('click', () => {
-      issueTarget = { type: 'class', className, boxIndices: items.map(item => item.idx) };
-      activeBoxIndex = items[0]?.idx ?? -1;
-      loadIssueToForm();
-      renderCurrent();
-      document.getElementById('issueChecks').scrollIntoView({ block: 'nearest' });
-    });
-    actions.appendChild(err);
     boxList.appendChild(row);
   });
 }
@@ -2202,10 +2261,12 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     ctx.fillStyle = color;
     ctx.fillRect(x, y, bw, bh);
     ctx.globalAlpha = 1;
+    const canShowSelection = record === records[currentIndex];
+    const isActive = canShowSelection && (idx === activeBoxIndex || selectedBoxIndices.has(idx));
     ctx.shadowColor = color;
-    ctx.shadowBlur = idx === activeBoxIndex ? 16 : 10;
-    ctx.lineWidth = idx === activeBoxIndex ? 3 : 2;
-    ctx.strokeStyle = idx === activeBoxIndex ? '#ffffff' : color;
+    ctx.shadowBlur = isActive ? 16 : 10;
+    ctx.lineWidth = isActive ? 3 : 2;
+    ctx.strokeStyle = isActive ? '#ffffff' : color;
     ctx.strokeRect(x, y, bw, bh);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.72;
@@ -2300,10 +2361,11 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     const y = ((box.yc - box.bh / 2) * imgH - sy) * scaleY;
     const w = box.bw * imgW * scaleX;
     const h = box.bh * imgH * scaleY;
+    const isActive = idx === activeBoxIndex || selectedBoxIndices.has(idx);
     ctx.shadowColor = color;
-    ctx.shadowBlur = idx === activeBoxIndex ? 14 : 9;
-    ctx.lineWidth = idx === activeBoxIndex ? 3 : 2;
-    ctx.strokeStyle = idx === activeBoxIndex ? '#ffffff' : color;
+    ctx.shadowBlur = isActive ? 14 : 9;
+    ctx.lineWidth = isActive ? 3 : 2;
+    ctx.strokeStyle = isActive ? '#ffffff' : color;
     ctx.strokeRect(x, y, w, h);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.72;
@@ -2355,8 +2417,8 @@ function buildIssueChecks() {
 buildIssueChecks();
 
 function updateMissingClassVisibility() {
-  const hasMissing = Array.from(document.querySelectorAll('#issueChecks input:checked')).some(input => input.value === 'missing');
-  document.getElementById('missingClassField').classList.toggle('hidden', !hasMissing);
+  const needsClass = Array.from(document.querySelectorAll('#issueChecks input:checked')).some(input => input.value === 'missing' || input.value === 'unnecessary');
+  document.getElementById('missingClassField').classList.toggle('hidden', !needsClass);
 }
 
 function loadIssueToForm() {
@@ -2370,39 +2432,54 @@ function loadIssueToForm() {
 }
 
 function updateCurrentIssue() {
-  const record = records[currentIndex];
-  if (!record) return;
-  const types = Array.from(document.querySelectorAll('#issueChecks input:checked')).map(i => i.value);
-  const missingClass = document.getElementById('missingClassSelect').value;
-  const note = document.getElementById('noteInput').value.trim();
-  const target = issueTarget || (activeBoxIndex >= 0 ? { type: 'box', boxIndex: activeBoxIndex, className: record.boxes[activeBoxIndex]?.className } : { type: 'image' });
   updateMissingClassVisibility();
-  if (!types.length && !note) {
-    removeIssue(record.id, targetKey(target));
-    return;
+}
+
+function buildCurrentIssueTarget(record) {
+  if (issueTarget) return issueTarget;
+  const boxIndices = Array.from(selectedBoxIndices).sort((a, b) => a - b);
+  if (!boxIndices.length) return { type: 'image' };
+  if (boxIndices.length === 1) {
+    const idx = boxIndices[0];
+    return { type: 'box', boxIndex: idx, className: record.boxes[idx]?.className };
   }
-  upsertIssue(record, {
-    target,
-    targetKey: targetKey(target),
-    targetLabel: targetLabel(target),
-    types,
-    missingClass: types.includes('missing') ? missingClass : '',
-    note
-  });
-  renderStats();
-  renderIssuesList();
-  updateGalleryHighlights();
+  return { type: 'boxes', boxIndices, className: boxIndices.map(idx => record.boxes[idx]?.className).filter(Boolean).join(', ') };
+}
+
+function resetIssueDraft() {
+  issueTarget = null;
+  selectedBoxIndices.clear();
+  activeBoxIndex = -1;
+  document.querySelectorAll('#issueChecks input').forEach(input => input.checked = false);
+  document.getElementById('missingClassSelect').value = '';
+  document.getElementById('noteInput').value = '';
+  updateMissingClassVisibility();
 }
 
 function markOk() {
   const record = records[currentIndex];
   if (!record) return;
+  const types = Array.from(document.querySelectorAll('#issueChecks input:checked')).map(i => i.value);
+  const missingClass = document.getElementById('missingClassSelect').value;
+  const note = document.getElementById('noteInput').value.trim();
+  if (types.length || note) {
+    const target = buildCurrentIssueTarget(record);
+    upsertIssue(record, {
+      target,
+      targetKey: targetKey(target),
+      targetLabel: targetLabel(target),
+      types,
+      missingClass: (types.includes('missing') || types.includes('unnecessary')) ? missingClass : '',
+      note
+    }, false);
+  }
   reviewedSet.add(record.id);
   saveReviewResult(record, actionFromIssue(getRecordIssue(record)) || 'approved', getRecordIssue(record));
-  loadIssueToForm();
+  resetIssueDraft();
   renderStats();
   renderIssuesList();
   updateGalleryHighlights();
+  renderCurrent();
 }
 
 function clearCurrentIssue() {
@@ -2412,6 +2489,7 @@ function clearCurrentIssue() {
   reviewedSet.delete(record.id);
   issueTarget = null;
   activeBoxIndex = -1;
+  selectedBoxIndices.clear();
   saveReviewResult(record, 'cleared');
   loadIssueToForm();
   renderStats();
@@ -2449,6 +2527,9 @@ function renderIssuesList() {
       const entry = rows.find(item => item.targetKey === btn.dataset.editIssue);
       if (!entry) return;
       issueTarget = entry.target || { type: 'image' };
+      selectedBoxIndices.clear();
+      if (issueTarget.type === 'box') selectedBoxIndices.add(issueTarget.boxIndex);
+      if (issueTarget.type === 'boxes') issueTarget.boxIndices.forEach(idx => selectedBoxIndices.add(idx));
       activeBoxIndex = issueTarget.type === 'box' ? issueTarget.boxIndex : -1;
       loadIssueToForm();
       renderCurrent();
@@ -2754,6 +2835,7 @@ function resetAll() {
   currentIndex = -1;
   activeBoxIndex = -1;
   issueTarget = null;
+  selectedBoxIndices.clear();
   issueMap.clear();
   reviewedSet.clear();
   imageInput.value = '';
