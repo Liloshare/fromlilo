@@ -1,152 +1,213 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>업무자동화 툴</title>
-  <style>
-    :root {
-      --bg: #050505;
-      --text: #f3f0e8;
-      --muted: #9a968c;
-      --line: #2a2926;
-      --soft: #12110f;
-      --accent: #f3f0e8;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Courier New", Courier, "SFMono-Regular", Consolas, monospace;
-    }
-
-    main {
-      width: min(760px, calc(100% - 40px));
-      margin: 0 auto;
-      padding: 88px 0 72px;
-    }
-
-    header {
-      margin-bottom: 44px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 52px;
-      line-height: 1.08;
-      letter-spacing: 0;
-      font-weight: 400;
-    }
-
-    .subtitle {
-      max-width: 660px;
-      margin: 22px 0 0;
-      color: var(--muted);
-      font-size: 18px;
-      line-height: 1.75;
-    }
-
-    .divider {
-      height: 1px;
-      background: var(--line);
-      margin: 0 0 34px;
-    }
-
-    .tool-list {
-      display: grid;
-      gap: 0;
-    }
-
-    .tool-link {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 22px;
-      align-items: center;
-      padding: 24px 0;
-      border-bottom: 1px solid var(--line);
-      color: inherit;
-      text-decoration: none;
-    }
-
-    .tool-link:hover .tool-title {
-      color: #ffffff;
-    }
-
-    .tool-kicker {
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 400;
-      margin-bottom: 10px;
-    }
-
-    .tool-title {
-      margin: 0;
-      font-size: 24px;
-      line-height: 1.35;
-      font-weight: 400;
-    }
-
-    .tool-desc {
-      margin: 12px 0 0;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.7;
-    }
-
-    .open-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 72px;
-      height: 36px;
-      border: 1px solid var(--line);
-      border-radius: 0;
-      background: var(--soft);
-      color: var(--text);
-      font-size: 14px;
-      font-weight: 400;
-      white-space: nowrap;
-    }
-
-    .tool-link:hover .open-button {
-      border-color: #5a5750;
-      background: #1a1815;
-    }
-
-    @media (max-width: 560px) {
-      main { width: min(100% - 30px, 760px); padding-top: 56px; }
-      h1 { font-size: 38px; }
-      .subtitle { font-size: 16px; }
-      .tool-link { grid-template-columns: 1fr; gap: 12px; }
-      .open-button { width: 100%; }
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <header>
-      <div>
-        <h1>Automation Tools</h1>
-        <p class="subtitle">QC / Review / File Check / Delivery Prep</p>
-      </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Lilo - AI 서비스 결제, 의류/잡화 판매, 온라인 라벨링 검수 툴을 위한 실험형 커머스 허브."
+    />
+    <title>Lilo | AI, Shop, Labeling QA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Noto+Sans+KR:wght@500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header" aria-label="주요 메뉴">
+      <a class="brand" href="./index.html#top" aria-label="Lilo 홈">
+        <span class="brand-mark">Li</span> 
+        <span>Lilo</span>
+      </a>
+      <nav>
+        <a href="./index.html#products">서비스</a>
+        <a href="./index.html#workflow">운영 방식</a>
+        <a href="./index.html#waitlist">문의</a>
+      </nav>
     </header>
 
-    <div class="divider"></div>
-
-    <section class="tool-list" aria-label="자동화 도구 목록">
-      <a class="tool-link" href="./tools/joseon-bbox-qc/">
-        <div>
-          <div class="tool-kicker">Bounding Box QC</div>
-          <h2 class="tool-title">Joseon BBox QC</h2>
-          <p class="tool-desc">Images / YOLO Labels / Matching / Issues / Export</p>
+    <main id="top">
+      <section class="hero section-band">
+        <div class="hero-copy">
+          <p class="eyebrow">Lilo</p>
+          <h1>작은 아이디어도<br class="mobile-only" /> 바로 구현하는 <br class="mobile-only" /> Lilo.</h1>
+          <p class="lead">
+            AI 서비스, 셀렉트 상품, 라벨링 검수 툴을
+            결제와 이어가는 온라인 스토어입니다.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#products">둘러보기</a>
+            <a class="button secondary" href="#waitlist">다음 런칭 알림 받기</a>
+          </div>
         </div>
-        <span class="open-button">Open</span>
-      </a>
-    </section>
-  </main>
-</body>
+        <div class="service-slider" aria-label="Lilo 서비스 카드">
+          <div class="slot-head">
+            <span>Featured slots</span>
+            <div class="slot-controls" aria-label="서비스 카드 넘기기">
+              <button type="button" data-slot-scroll="-1" aria-label="이전 서비스">‹</button>
+              <button type="button" data-slot-scroll="1" aria-label="다음 서비스">›</button>
+            </div>
+          </div>
+          <div class="slot-track">
+            <a class="slot-card ai-card" href="./ai-profile.html">
+              <div class="card-top">
+                <span class="tag">AI Service</span>
+                <span class="price">₩49,000~</span>
+              </div>
+              <div class="slot-visual profile-visual">
+                <div class="face"></div>
+                <span>AI Actor Profile</span>
+              </div>
+              <strong>배우 프로필 제작</strong>
+              <p>사진을 업로드하고 원하는 스타일의 프로필을 주문합니다.</p>
+              <span class="card-link">서비스 보기</span>
+            </a>
+
+            <a class="slot-card shop-card" href="./shop.html">
+              <div class="card-top">
+                <span class="tag">Shop</span>
+                <span class="price">Drop</span>
+              </div>
+              <div class="slot-visual shop-visual">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <strong>의류/잡화 셀렉션</strong>
+              <p>작은 수량의 상품을 가볍게 소개하고 판매합니다.</p>
+              <span class="card-link">상품 보기</span>
+            </a>
+
+            <a class="slot-card qa-card" href="./labeling-qa.html">
+              <div class="card-top">
+                <span class="tag">Tool</span>
+                <span class="price">B2B</span>
+              </div>
+              <div class="slot-visual qa-visual">
+                <div><b>128</b><small>Tasks</small></div>
+                <div><b>96</b><small>Review</small></div>
+                <div><b>94%</b><small>Score</small></div>
+              </div>
+              <strong>라벨링 검수 툴</strong>
+              <p>작업 검수, 승인, 반려 흐름을 웹에서 관리합니다.</p>
+              <span class="card-link">툴 보기</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="ticker" aria-label="Lilo 활용 분야">
+        <span>AI PROFILE</span>
+        <span>FASHION SHOP</span>
+        <span>LABELING QA</span>
+        <span>PAYMENT</span>
+        <span>SMALL LAUNCHES</span>
+      </section>
+
+      <section id="products" class="products section-band">
+        <div class="section-heading">
+          <p class="eyebrow">what can live here</p>
+          <h2>한 도메인에 올릴 것들.</h2>
+        </div>
+
+        <div class="product-grid">
+          <article class="product-card ai-card">
+            <div class="card-top">
+              <span class="tag">AI Service</span>
+              <span class="price">₩49,000~</span>
+            </div>
+            <div class="mock mock-profile">
+              <div class="face"></div>
+              <div>
+                <strong>배우 프로필 제작</strong>
+                <p>사진 업로드부터 결과물 구매까지.</p>
+              </div>
+            </div>
+            <a href="./ai-profile.html">서비스 보기</a>
+          </article>
+
+          <article class="product-card shop-card">
+            <div class="card-top">
+              <span class="tag">Shop</span>
+              <span class="price">₩28,000~</span>
+            </div>
+            <div class="mock product-shot">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <strong>의류/잡화 셀렉션</strong>
+            <p>작은 수량으로 가볍게 판매.</p>
+            <a href="./shop.html">상품 보기</a>
+          </article>
+
+          <article class="product-card qa-card">
+            <div class="card-top">
+              <span class="tag">Tool</span>
+              <span class="price">B2B</span>
+            </div>
+            <div class="mock qa-board">
+              <div><b>128</b><small>Tasks</small></div>
+              <div><b>96</b><small>Reviewed</small></div>
+              <div><b>94%</b><small>Accuracy</small></div>
+            </div>
+            <strong>온라인 라벨링 검수</strong>
+            <p>승인과 반려를 웹에서 관리.</p>
+            <a href="./labeling-qa.html">툴 보기</a>
+          </article>
+        </div>
+      </section>
+
+      <section id="workflow" class="workflow">
+        <div class="workflow-copy">
+          <p class="eyebrow">launch rhythm</p>
+          <h2>판매와 운영 사이.</h2>
+          <p>
+            상품은 간단하게 보여주고, 필요한 흐름만 남깁니다.
+            결제, 문의, 검수 대시보드로 확장하기 좋은 구조입니다.
+          </p>
+        </div>
+        <div class="steps">
+          <div><span>1</span><strong>정리</strong><p>상품과 가격을 정합니다.</p></div>
+          <div><span>2</span><strong>판매</strong><p>결제와 문의를 받습니다.</p></div>
+          <div><span>3</span><strong>운영</strong><p>상태를 확인합니다.</p></div>
+        </div>
+      </section>
+
+      <section id="waitlist" class="waitlist section-band">
+        <div>
+          <p class="eyebrow">coming soon</p>
+          <h2>Lilo 오픈 준비 중.</h2>
+          <p>첫 상품과 데모를 준비하고 있습니다.</p>
+        </div>
+        <form>
+          <label for="email">이메일</label>
+          <div class="form-row">
+            <input id="email" type="email" placeholder="your@email.com" />
+            <button type="button">알림 받기</button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <footer>
+      <strong>Lilo</strong>
+      <span>AI services, shop drops, and labeling QA experiments.</span>
+    </footer>
+    <script>
+      const slotTrack = document.querySelector(".slot-track");
+      document.querySelectorAll("[data-slot-scroll]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const direction = Number(button.dataset.slotScroll);
+          slotTrack.scrollBy({
+            left: direction * slotTrack.clientWidth * 0.82,
+            behavior: "smooth",
+          });
+        });
+      });
+    </script>
+  </body>
 </html>

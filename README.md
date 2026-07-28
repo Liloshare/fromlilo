@@ -1,37 +1,13 @@
-# fromlilo.com
+# Lilo landing
 
-fromlilo.com site workspace.
+정적 HTML/CSS 랜딩 페이지입니다.
 
-## Structure
+## 실행
 
-- `ai-services/`: AI generated service pages
-- `automation-tools/`: Work automation tool pages
-- `shop/`: Shopping mall pages
+브라우저에서 `index.html`을 직접 열거나, 로컬 서버로 확인합니다.
 
-## Page Ideas
-
-### AI Services
-
-- Actor profile builder
-- Resume builder
-
-### Automation Tools
-
-- Shipbuilding QC tool
-
-### Shop
-
-- Shopping mall
-
-## Upload Notes
-
-Put each page or service in its own folder.
-
-Example:
-
-```text
-ai-services/actor-profile/
-ai-services/resume-builder/
-automation-tools/shipbuilding-qc/
-shop/
+```bash
+python3 -m http.server 4173
 ```
+
+그 다음 `http://localhost:4173`으로 접속합니다.
