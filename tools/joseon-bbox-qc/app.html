@@ -920,21 +920,7 @@
             <span id="classSummary">15 CLASS</span>
             <button type="button" onclick="openClassEditor()">EDIT</button>
           </div>
-          <textarea id="classInput">0_Burnt
-1_Hume
-2_Point_Burnt
-3_Point_hume
-4_Rust
-5_Rust_area
-6_Point_rust
-7_Chalk
-8_Feathering
-9_Zinc
-10_Oil
-11_M/D
-12_Blow_hole
-13_Spatter
-14_Weld</textarea>
+          <textarea id="classInput"></textarea>
           <div class="hint">OBJ.NAMES / CLASS LIST</div>
         </div>
 
@@ -1129,6 +1115,7 @@ let galleryThumbMap = new Map(); // record.id -> { card, canvas }
 let galleryObserver = null;
 let searchDebounceTimer = null;
 const userEmail = sessionStorage.getItem('fromliloUserEmail') || localStorage.getItem('fromliloUserEmail') || '';
+let objNamesClasses = [];
 
 const imageInput = document.getElementById('imageInput');
 const labelInput = document.getElementById('labelInput');
@@ -1219,7 +1206,7 @@ function updateClassSummary() {
     .split(/\r?\n|,/)
     .map(s => s.trim())
     .filter(Boolean).length;
-  summary.textContent = `${count} CLASS`;
+  summary.textContent = count ? `${count} CLASS` : 'LABEL CLASS';
 }
 
 function openClassEditor() {
@@ -1302,14 +1289,43 @@ async function handleLabels(files) {
   const objNames = all.find(f => /obj\.names$/i.test(f.name));
   if (objNames) {
     const text = await objNames.text();
-    document.getElementById('classInput').value = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean).join('\n');
-    readClassInput();
-    renderClassControls();
+    objNamesClasses = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  } else {
+    objNamesClasses = [];
   }
+  await buildClassesFromLabelFiles();
   labelDrop.classList.add('loaded');
   labelDrop.querySelector('strong').textContent = `LBL ${labelFiles.length}`;
-  labelDrop.querySelector('span').textContent = objNames ? 'OBJ.NAMES' : 'LOADED';
+  labelDrop.querySelector('span').textContent = objNames ? `OBJ.NAMES / ${classes.length} CLASS` : `${classes.length} CLASS`;
   checkReady();
+}
+
+async function collectClassIdsFromFile(file) {
+  const text = await file.text();
+  const ids = [];
+  text.split(/\r?\n/).forEach(line => {
+    const clean = line.trim();
+    if (!clean) return;
+    const classId = Number(clean.split(/\s+/)[0]);
+    if (Number.isInteger(classId) && classId >= 0) ids.push(classId);
+  });
+  return ids;
+}
+
+async function buildClassesFromLabelFiles() {
+  const idSet = new Set();
+  const idLists = await Promise.all(labelFiles.map(collectClassIdsFromFile));
+  idLists.flat().forEach(id => idSet.add(id));
+  const ids = Array.from(idSet).sort((a, b) => a - b);
+  const maxId = ids.length ? Math.max(...ids) : -1;
+  const next = [];
+  for (let id = 0; id <= maxId; id++) {
+    next[id] = objNamesClasses[id] || `CLASS_${id}`;
+  }
+  document.getElementById('classInput').value = next.filter(Boolean).join('\n');
+  readClassInput();
+  renderClassControls();
+  updateClassSummary();
 }
 
 function checkReady() {
@@ -1322,10 +1338,12 @@ function readClassInput() {
     if (!classColors[name]) classColors[name] = DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
   });
   visibleClasses = classFilter === '__all__' ? new Set(classes) : new Set([classFilter]);
+  updateClassSummary();
   renderMissingClassOptions();
 }
 
-function runValidation() {
+async function runValidation() {
+  if (!classes.length) await buildClassesFromLabelFiles();
   readClassInput();
   records = [];
   issueMap.clear();
@@ -2528,6 +2546,7 @@ function resetAll() {
   reviewPos = -1;
   imageFiles = [];
   labelFiles = [];
+  objNamesClasses = [];
   records = [];
   currentIndex = -1;
   issueMap.clear();
@@ -2540,6 +2559,7 @@ function resetAll() {
   imageDrop.querySelector('span').textContent = 'JPG / JPEG / PNG';
   labelDrop.querySelector('strong').textContent = 'SELECT LABEL';
   labelDrop.querySelector('span').textContent = 'YOLO TXT';
+  document.getElementById('classInput').value = '';
   runBtn.disabled = true;
   document.getElementById('csvBtn').disabled = true;
   document.getElementById('jsonBtn').disabled = true;
