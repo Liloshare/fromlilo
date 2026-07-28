@@ -9,7 +9,8 @@ export default defineConfig({
         aiProfile: resolve(__dirname, "ai-profile.html"),
         labelingQa: resolve(__dirname, "labeling-qa.html"),
         shop: resolve(__dirname, "shop.html"),
-        shipbuildingQc: resolve(__dirname, "tools/joseon-bbox-qc/index.html")
+        shipbuildingQc: resolve(__dirname, "tools/joseon-bbox-qc/index.html"),
+        shipbuildingQcApp: resolve(__dirname, "tools/joseon-bbox-qc/app.html")
       }
     }
   }

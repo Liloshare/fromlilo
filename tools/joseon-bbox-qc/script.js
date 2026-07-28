@@ -47,8 +47,9 @@ function activateTool() {
   authStatus.textContent = "로그인 완료";
   authStatus.classList.add("ready");
   workspace.classList.remove("locked");
-  workspaceText.textContent = "검수 툴이 활성화되었습니다. 작업을 시작할 수 있습니다.";
+  workspaceText.textContent = "검수 툴로 이동합니다.";
   startToolButton.disabled = false;
+  window.location.href = "./app.html";
 }
 
 qcToolButton.addEventListener("click", showIntro);
@@ -66,5 +67,5 @@ loginForm.addEventListener("submit", (event) => {
 });
 
 startToolButton.addEventListener("click", () => {
-  workspaceText.textContent = "현재는 데모 화면입니다. 실제 검수 기능 파일을 연결하면 바로 사용할 수 있습니다.";
+  window.location.href = "./app.html";
 });
