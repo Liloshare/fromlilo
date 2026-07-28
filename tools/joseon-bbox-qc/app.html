@@ -1049,7 +1049,7 @@
               <div class="check-grid" id="issueChecks"></div>
               <div class="issue-inline-select hidden" id="missingClassField">
                 <label>ACTION CLASS</label>
-                <select id="missingClassSelect" onchange="updateCurrentIssue()"></select>
+                <select id="missingClassSelect" onchange="updateCurrentIssue()" multiple size="5"></select>
               </div>
             </div>
             <div class="field">
@@ -1148,7 +1148,6 @@ const ISSUE_TYPES = [
   ['wrong_class', 'WRONG CLASS'],
   ['wrong_box', 'SIZE'],
   ['missing', 'MISSING'],
-  ['duplicate', 'DUP'],
   ['unnecessary', 'DELETE']
 ];
 
@@ -1499,9 +1498,7 @@ function autoDetectDuplicateBoxes() {
     if (record.status !== 'matched' || !record.boxes.length) return;
     const seen = new Map();
     record.boxes.forEach((box, idx) => {
-      const coordKey = [box.className, box.xc, box.yc, box.bw, box.bh]
-        .map(value => typeof value === 'number' ? value.toFixed(6) : value)
-        .join('|');
+      const coordKey = [box.xc, box.yc, box.bw, box.bh].join('|');
       if (!seen.has(coordKey)) {
         seen.set(coordKey, idx);
         return;
@@ -1832,7 +1829,7 @@ function buildClassChip(value, label, color) {
 function renderMissingClassOptions() {
   ['missingClassSelect', 'compareMissingClassSelect'].forEach(id => {
     const select = document.getElementById(id);
-    select.innerHTML = '<option value="">NONE</option>';
+    select.innerHTML = id === 'missingClassSelect' ? '' : '<option value="">NONE</option>';
     classes.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
@@ -2426,13 +2423,51 @@ function loadIssueToForm() {
   const issue = record ? getRecordIssue(record) : null;
   const entry = issue?.issues?.find(item => item.targetKey === targetKey(issueTarget)) || null;
   document.querySelectorAll('#issueChecks input').forEach(input => input.checked = entry?.types?.includes(input.value) || false);
-  document.getElementById('missingClassSelect').value = entry?.missingClass || '';
+  setSelectedActionClasses(entry?.missingClass || '');
   document.getElementById('noteInput').value = entry?.note || '';
   updateMissingClassVisibility();
 }
 
+function getSelectedActionClasses() {
+  return Array.from(document.getElementById('missingClassSelect').selectedOptions).map(option => option.value).filter(Boolean);
+}
+
+function setSelectedActionClasses(value) {
+  const values = new Set(String(value || '').split('|').filter(Boolean));
+  Array.from(document.getElementById('missingClassSelect').options).forEach(option => {
+    option.selected = values.has(option.value);
+  });
+}
+
 function updateCurrentIssue() {
+  const record = records[currentIndex];
+  if (!record) return;
   updateMissingClassVisibility();
+  const types = Array.from(document.querySelectorAll('#issueChecks input:checked')).map(i => i.value);
+  const actionClasses = getSelectedActionClasses();
+  const note = document.getElementById('noteInput').value.trim();
+  const needsClass = types.some(type => type === 'missing' || type === 'unnecessary');
+  const effectiveTypes = needsClass && !actionClasses.length
+    ? types.filter(type => type !== 'missing' && type !== 'unnecessary')
+    : types;
+  const target = buildCurrentIssueTarget(record);
+
+  if (!effectiveTypes.length && !note) {
+    removeIssue(record.id, targetKey(target));
+    return;
+  }
+
+  upsertIssue(record, {
+    target,
+    targetKey: targetKey(target),
+    targetLabel: targetLabel(target),
+    types: effectiveTypes,
+    missingClass: needsClass ? actionClasses.join('|') : '',
+    note
+  });
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
 }
 
 function buildCurrentIssueTarget(record) {
@@ -2451,7 +2486,7 @@ function resetIssueDraft() {
   selectedBoxIndices.clear();
   activeBoxIndex = -1;
   document.querySelectorAll('#issueChecks input').forEach(input => input.checked = false);
-  document.getElementById('missingClassSelect').value = '';
+  setSelectedActionClasses('');
   document.getElementById('noteInput').value = '';
   updateMissingClassVisibility();
 }
@@ -2459,20 +2494,6 @@ function resetIssueDraft() {
 function markOk() {
   const record = records[currentIndex];
   if (!record) return;
-  const types = Array.from(document.querySelectorAll('#issueChecks input:checked')).map(i => i.value);
-  const missingClass = document.getElementById('missingClassSelect').value;
-  const note = document.getElementById('noteInput').value.trim();
-  if (types.length || note) {
-    const target = buildCurrentIssueTarget(record);
-    upsertIssue(record, {
-      target,
-      targetKey: targetKey(target),
-      targetLabel: targetLabel(target),
-      types,
-      missingClass: (types.includes('missing') || types.includes('unnecessary')) ? missingClass : '',
-      note
-    }, false);
-  }
   reviewedSet.add(record.id);
   saveReviewResult(record, actionFromIssue(getRecordIssue(record)) || 'approved', getRecordIssue(record));
   resetIssueDraft();
