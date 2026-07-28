@@ -784,6 +784,91 @@
     .class-chip .chip-swatch {
       border-radius: 0;
     }
+
+    .panel,
+    .canvas-frame,
+    .meta-table,
+    .box-list,
+    .issues-list,
+    .compare-issue-form,
+    .compare-panel {
+      box-shadow: 0 0 0 1px rgba(243, 240, 232, 0.06), 0 0 18px rgba(243, 240, 232, 0.08);
+    }
+
+    .panel:hover,
+    .canvas-frame:hover,
+    .compare-panel:hover {
+      box-shadow: 0 0 0 1px rgba(243, 240, 232, 0.18), 0 0 28px rgba(243, 240, 232, 0.14);
+    }
+
+    .class-summary {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 10px;
+      box-shadow: 0 0 18px rgba(243, 240, 232, 0.08);
+    }
+
+    #classInput {
+      display: none;
+    }
+
+    .class-edit-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 700;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.82);
+    }
+
+    .class-edit-box {
+      width: min(720px, 100%);
+      max-height: min(760px, calc(100vh - 40px));
+      overflow: auto;
+      border: 1px solid var(--line);
+      background: var(--bg);
+      box-shadow: 0 0 0 1px rgba(243, 240, 232, 0.12), 0 0 40px rgba(243, 240, 232, 0.14);
+    }
+
+    .class-edit-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .class-edit-list {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+    }
+
+    .class-edit-row {
+      display: grid;
+      grid-template-columns: 48px 18px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .class-edit-row code {
+      color: var(--muted);
+    }
+
+    .class-edit-row input {
+      min-width: 0;
+    }
+
+    .box-class-once {
+      opacity: 0.68;
+      font-size: 11px;
+    }
   </style>
 </head>
 <body>
@@ -822,6 +907,10 @@
 
         <div class="field">
           <label>CLASS</label>
+          <div class="class-summary">
+            <span id="classSummary">15 CLASS</span>
+            <button type="button" onclick="openClassEditor()">EDIT</button>
+          </div>
           <textarea id="classInput">0_Burnt
 1_Hume
 2_Point_Burnt
@@ -936,6 +1025,19 @@
       </div>
     </section>
   </main>
+</div>
+
+<div class="class-edit-modal hidden" id="classEditModal">
+  <div class="class-edit-box">
+    <div class="class-edit-head">
+      <div class="panel-title">CLASS EDIT</div>
+      <div class="btn-row">
+        <button type="button" onclick="applyClassEditor()">APPLY</button>
+        <button type="button" onclick="closeClassEditor()">CLOSE</button>
+      </div>
+    </div>
+    <div class="class-edit-list" id="classEditList"></div>
+  </div>
 </div>
 
 <div class="loading-overlay hidden" id="loadingOverlay">
@@ -1088,6 +1190,7 @@ document.getElementById('searchInput').addEventListener('input', () => {
 document.getElementById('classInput').addEventListener('input', () => {
   readClassInput();
   renderClassControls();
+  updateClassSummary();
   renderCurrent();
 });
 document.getElementById('missingClassSelect').addEventListener('change', updateCurrentIssue);
@@ -1098,6 +1201,72 @@ function normalizedStem(name) {
 
 function filePath(file) {
   return file.webkitRelativePath || file.name;
+}
+
+function updateClassSummary() {
+  const summary = document.getElementById('classSummary');
+  if (!summary) return;
+  const count = document.getElementById('classInput').value
+    .split(/\r?\n|,/)
+    .map(s => s.trim())
+    .filter(Boolean).length;
+  summary.textContent = `${count} CLASS`;
+}
+
+function openClassEditor() {
+  readClassInput();
+  const list = document.getElementById('classEditList');
+  list.innerHTML = '';
+  classes.forEach((name, idx) => {
+    const row = document.createElement('div');
+    row.className = 'class-edit-row';
+    row.innerHTML = `
+      <code>${idx}</code>
+      <span class="swatch" style="background:${classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length]}"></span>
+      <input type="text" value="${escapeHtml(name)}" data-class-index="${idx}">
+    `;
+    list.appendChild(row);
+  });
+  document.getElementById('classEditModal').classList.remove('hidden');
+}
+
+function closeClassEditor() {
+  document.getElementById('classEditModal').classList.add('hidden');
+}
+
+function applyClassEditor() {
+  const previous = [...classes];
+  const next = Array.from(document.querySelectorAll('#classEditList input'))
+    .map(input => input.value.trim())
+    .filter(Boolean);
+  if (!next.length) return;
+
+  const nextColors = {};
+  next.forEach((name, idx) => {
+    nextColors[name] = classColors[previous[idx]] || classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+  });
+  classColors = nextColors;
+  document.getElementById('classInput').value = next.join('\n');
+
+  records.forEach(record => {
+    record.boxes.forEach(box => {
+      if (next[box.classId]) box.className = next[box.classId];
+    });
+    if (record.labelVariants) {
+      record.labelVariants.forEach(variant => {
+        variant.boxes.forEach(box => {
+          if (next[box.classId]) box.className = next[box.classId];
+        });
+      });
+    }
+  });
+
+  readClassInput();
+  renderClassControls();
+  populateMissingClassOptions();
+  renderGallery();
+  if (currentIndex >= 0) selectRecord(currentIndex);
+  closeClassEditor();
 }
 
 function handleImages(files) {
@@ -1773,10 +1942,14 @@ async function renderCurrent() {
   magnifierImg = record.imageFile ? await loadImage(record.imageFile) : null;
   renderMeta(record);
   boxList.innerHTML = record.boxes.length ? '' : '<div class="hint">NO BOX</div>';
+  const firstByClass = new Set();
   record.boxes.forEach((box, idx) => {
     const row = document.createElement('div');
     row.className = 'box-row';
-    row.innerHTML = `<span class="swatch" style="background:${classColors[box.className] || '#a8a4bd'}"></span><span>${idx + 1}. ${escapeHtml(box.className)}</span><button>SEL</button>`;
+    row.title = `${idx + 1}. ${box.className}`;
+    const showClass = !firstByClass.has(box.className);
+    firstByClass.add(box.className);
+    row.innerHTML = `<span class="swatch" style="background:${classColors[box.className] || '#a8a4bd'}"></span><span>${idx + 1}${showClass ? `. <span class="box-class-once">${escapeHtml(box.className)}</span>` : ''}</span><button>SEL</button>`;
     row.querySelector('button').addEventListener('click', () => {
       activeBoxIndex = idx;
       renderCurrent();
@@ -1827,6 +2000,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
   ctx.save();
   const scaleX = canvasW / imgW;
   const scaleY = canvasH / imgH;
+  const labeledClasses = new Set();
   record.boxes.forEach((box, idx) => {
     if (!visibleClasses.has(box.className)) return;
     const color = classColors[box.className] || '#a8a4bd';
@@ -1834,21 +2008,26 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     const y = (box.yc - box.bh / 2) * imgH * scaleY;
     const bw = box.bw * imgW * scaleX;
     const bh = box.bh * imgH * scaleY;
-    ctx.globalAlpha = 0.22;
+    ctx.globalAlpha = isMain ? 0.08 : 0.14;
     ctx.fillStyle = color;
     ctx.fillRect(x, y, bw, bh);
     ctx.globalAlpha = 1;
-    ctx.lineWidth = idx === activeBoxIndex ? 5 : Math.max(2, Math.round(Math.min(canvasW, canvasH) / 260));
+    ctx.shadowColor = color;
+    ctx.shadowBlur = idx === activeBoxIndex ? 14 : 8;
+    ctx.lineWidth = isMain ? (idx === activeBoxIndex ? 2 : 1) : (idx === activeBoxIndex ? 3 : 1);
     ctx.strokeStyle = idx === activeBoxIndex ? '#ffffff' : color;
     ctx.strokeRect(x, y, bw, bh);
-    if (isMain || canvasW > 300) {
+    ctx.shadowBlur = 0;
+    const shouldLabel = !labeledClasses.has(box.className);
+    if (shouldLabel && (isMain || canvasW > 300)) {
+      labeledClasses.add(box.className);
       const label = `${idx + 1} ${box.className}`;
-      ctx.font = `${Math.max(11, Math.round(canvasW / 55))}px sans-serif`;
+      ctx.font = `${Math.max(10, Math.round(canvasW / 72))}px "Courier New", monospace`;
       const tw = ctx.measureText(label).width;
-      const th = Math.max(16, Math.round(canvasW / 45));
+      const th = Math.max(14, Math.round(canvasW / 58));
       ctx.fillStyle = color;
       ctx.fillRect(x, Math.max(0, y - th), tw + 10, th);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#050505';
       ctx.fillText(label, x + 5, Math.max(12, y - 5));
     }
   });
@@ -1925,9 +2104,12 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     const y = ((box.yc - box.bh / 2) * imgH - sy) * scaleY;
     const w = box.bw * imgW * scaleX;
     const h = box.bh * imgH * scaleY;
-    ctx.lineWidth = idx === activeBoxIndex ? 3 : 2;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = idx === activeBoxIndex ? 12 : 7;
+    ctx.lineWidth = idx === activeBoxIndex ? 2 : 1;
     ctx.strokeStyle = idx === activeBoxIndex ? '#ffffff' : color;
     ctx.strokeRect(x, y, w, h);
+    ctx.shadowBlur = 0;
   });
   ctx.restore();
 }
@@ -2344,6 +2526,7 @@ function resetAll() {
   document.getElementById('mainCanvas').height = 1;
   document.getElementById('posCounter').textContent = '';
   document.getElementById('statusText').textContent = 'IMAGE / LABEL';
+  updateClassSummary();
   renderStats();
   renderIssuesList();
 }
@@ -2355,6 +2538,7 @@ function escapeHtml(value) {
 readClassInput();
 renderClassControls();
 renderMissingClassOptions();
+updateClassSummary();
 </script>
 </body>
 </html>
