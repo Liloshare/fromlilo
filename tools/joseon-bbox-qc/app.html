@@ -1050,12 +1050,13 @@
               <div class="check-grid" id="issueChecks"></div>
               <div class="issue-inline-select hidden" id="missingClassField">
                 <label>ACTION CLASS</label>
-                <select id="missingClassSelect" onchange="updateCurrentIssue()" multiple size="5"></select>
+                <div class="check-grid" id="actionClassChecks"></div>
+                <button type="button" onclick="applyActionClassIssue()">DONE</button>
               </div>
             </div>
             <div class="field">
               <label>NOTE</label>
-              <textarea id="noteInput" placeholder="NOTE" oninput="updateCurrentIssue()"></textarea>
+              <textarea id="noteInput" placeholder="NOTE"></textarea>
             </div>
             <div class="btn-row">
               <button class="danger" onclick="clearCurrentIssue()">CLEAR</button>
@@ -1338,8 +1339,6 @@ document.getElementById('classInput').addEventListener('input', () => {
   updateClassSummary();
   renderCurrent();
 });
-document.getElementById('missingClassSelect').addEventListener('change', updateCurrentIssue);
-
 function applyClassPreset() {
   const key = document.getElementById('classPresetSelect').value;
   const preset = CLASS_PRESETS[key];
@@ -1836,9 +1835,18 @@ function buildClassChip(value, label, color) {
 }
 
 function renderMissingClassOptions() {
-  ['missingClassSelect', 'compareMissingClassSelect'].forEach(id => {
+  const actionWrap = document.getElementById('actionClassChecks');
+  actionWrap.innerHTML = '';
+  classes.forEach(name => {
+    const item = document.createElement('label');
+    item.className = 'check';
+    item.innerHTML = `<input type="checkbox" value="${escapeHtml(name)}"> ${escapeHtml(name)}`;
+    actionWrap.appendChild(item);
+  });
+
+  ['compareMissingClassSelect'].forEach(id => {
     const select = document.getElementById(id);
-    select.innerHTML = id === 'missingClassSelect' ? '' : '<option value="">NONE</option>';
+    select.innerHTML = '<option value="">NONE</option>';
     classes.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
@@ -2438,13 +2446,13 @@ function loadIssueToForm() {
 }
 
 function getSelectedActionClasses() {
-  return Array.from(document.getElementById('missingClassSelect').selectedOptions).map(option => option.value).filter(Boolean);
+  return Array.from(document.querySelectorAll('#actionClassChecks input:checked')).map(input => input.value).filter(Boolean);
 }
 
 function setSelectedActionClasses(value) {
   const values = new Set(String(value || '').split('|').filter(Boolean));
-  Array.from(document.getElementById('missingClassSelect').options).forEach(option => {
-    option.selected = values.has(option.value);
+  Array.from(document.querySelectorAll('#actionClassChecks input')).forEach(input => {
+    input.checked = values.has(input.value);
   });
 }
 
@@ -2456,12 +2464,10 @@ function updateCurrentIssue() {
   const actionClasses = getSelectedActionClasses();
   const note = document.getElementById('noteInput').value.trim();
   const needsClass = types.some(type => type === 'missing' || type === 'unnecessary');
-  const effectiveTypes = needsClass && !actionClasses.length
-    ? types.filter(type => type !== 'missing' && type !== 'unnecessary')
-    : types;
+  if (needsClass) return;
   const target = buildCurrentIssueTarget(record);
 
-  if (!effectiveTypes.length && !note) {
+  if (!types.length && !note) {
     removeIssue(record.id, targetKey(target));
     return;
   }
@@ -2470,13 +2476,39 @@ function updateCurrentIssue() {
     target,
     targetKey: targetKey(target),
     targetLabel: targetLabel(target),
-    types: effectiveTypes,
-    missingClass: needsClass ? actionClasses.join('|') : '',
+    types,
+    missingClass: actionClasses.join('|'),
     note
   });
   renderStats();
   renderIssuesList();
   updateGalleryHighlights();
+  resetIssueDraft();
+  renderCurrent();
+}
+
+function applyActionClassIssue() {
+  const record = records[currentIndex];
+  if (!record) return;
+  const types = Array.from(document.querySelectorAll('#issueChecks input:checked')).map(i => i.value);
+  const actionTypes = types.filter(type => type === 'missing' || type === 'unnecessary');
+  const actionClasses = getSelectedActionClasses();
+  const note = document.getElementById('noteInput').value.trim();
+  if (!actionTypes.length || !actionClasses.length) return;
+  const target = buildCurrentIssueTarget(record);
+  upsertIssue(record, {
+    target,
+    targetKey: targetKey(target),
+    targetLabel: targetLabel(target),
+    types,
+    missingClass: actionClasses.join('|'),
+    note
+  });
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
+  resetIssueDraft();
+  renderCurrent();
 }
 
 function buildCurrentIssueTarget(record) {
