@@ -49,7 +49,7 @@ function activateTool() {
   workspace.classList.remove("locked");
   workspaceText.textContent = "검수 툴로 이동합니다.";
   startToolButton.disabled = false;
-  window.location.href = "./app.html";
+  window.location.href = "./app";
 }
 
 qcToolButton.addEventListener("click", showIntro);
@@ -72,5 +72,5 @@ emailForm.addEventListener("submit", (event) => {
 });
 
 startToolButton.addEventListener("click", () => {
-  window.location.href = "./app.html";
+  window.location.href = "./app";
 });
