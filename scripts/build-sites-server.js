@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -10,22 +10,33 @@ mkdirSync(serverDir, { recursive: true });
 mkdirSync(hostingDir, { recursive: true });
 copyFileSync(join(root, ".openai", "hosting.json"), join(hostingDir, "hosting.json"));
 
-const assetsDir = join(dist, "assets");
-const assets = Object.fromEntries(
-  readdirSync(assetsDir).map((file) => [
-    `/assets/${file}`,
-    readFileSync(join(assetsDir, file), "utf8")
-  ])
-);
-const indexHtml = readFileSync(join(dist, "index.html"), "utf8");
+function collectFiles(dir, base = "") {
+  return Object.fromEntries(
+    readdirSync(dir).flatMap((name) => {
+      const filePath = join(dir, name);
+      const routePath = `${base}/${name}`;
+      if (routePath.startsWith("/server") || routePath.startsWith("/.openai")) {
+        return [];
+      }
+      if (statSync(filePath).isDirectory()) {
+        return Object.entries(collectFiles(filePath, routePath));
+      }
+      return [[routePath, readFileSync(filePath, "utf8")]];
+    })
+  );
+}
+
+const files = collectFiles(dist);
+files["/"] = files["/index.html"];
+for (const [path, body] of Object.entries(files)) {
+  if (path.endsWith("/index.html")) {
+    files[path.replace(/index\\.html$/, "")] = body;
+  }
+}
 
 writeFileSync(
   join(serverDir, "index.js"),
-  `const files = ${JSON.stringify({
-    "/index.html": indexHtml,
-    "/": indexHtml,
-    ...assets
-  })};
+  `const files = ${JSON.stringify(files)};
 
 function contentType(pathname) {
   if (pathname.endsWith(".html")) return "text/html; charset=utf-8";

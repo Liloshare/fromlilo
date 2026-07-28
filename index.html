@@ -1,90 +1,152 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>tools.fromlilo.com</title>
-    <link rel="stylesheet" href="./styles.css" />
-  </head>
-  <body>
-    <main class="shell">
-      <header class="topbar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>업무자동화 툴</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --text: #f3f0e8;
+      --muted: #9a968c;
+      --line: #2a2926;
+      --soft: #12110f;
+      --accent: #f3f0e8;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Courier New", Courier, "SFMono-Regular", Consolas, monospace;
+    }
+
+    main {
+      width: min(760px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 88px 0 72px;
+    }
+
+    header {
+      margin-bottom: 44px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 52px;
+      line-height: 1.08;
+      letter-spacing: 0;
+      font-weight: 400;
+    }
+
+    .subtitle {
+      max-width: 660px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.75;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+      margin: 0 0 34px;
+    }
+
+    .tool-list {
+      display: grid;
+      gap: 0;
+    }
+
+    .tool-link {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 22px;
+      align-items: center;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--line);
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .tool-link:hover .tool-title {
+      color: #ffffff;
+    }
+
+    .tool-kicker {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 400;
+      margin-bottom: 10px;
+    }
+
+    .tool-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.35;
+      font-weight: 400;
+    }
+
+    .tool-desc {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .open-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 0;
+      background: var(--soft);
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 400;
+      white-space: nowrap;
+    }
+
+    .tool-link:hover .open-button {
+      border-color: #5a5750;
+      background: #1a1815;
+    }
+
+    @media (max-width: 560px) {
+      main { width: min(100% - 30px, 760px); padding-top: 56px; }
+      h1 { font-size: 38px; }
+      .subtitle { font-size: 16px; }
+      .tool-link { grid-template-columns: 1fr; gap: 12px; }
+      .open-button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Automation Tools</h1>
+        <p class="subtitle">QC / Review / File Check / Delivery Prep</p>
+      </div>
+    </header>
+
+    <div class="divider"></div>
+
+    <section class="tool-list" aria-label="자동화 도구 목록">
+      <a class="tool-link" href="./tools/joseon-bbox-qc/">
         <div>
-          <p class="eyebrow">fromlilo tools</p>
-          <h1>업무 자동화 툴</h1>
+          <div class="tool-kicker">Bounding Box QC</div>
+          <h2 class="tool-title">Joseon BBox QC</h2>
+          <p class="tool-desc">Images / YOLO Labels / Matching / Issues / Export</p>
         </div>
-        <div class="status" id="authStatus">로그인 필요</div>
-      </header>
-
-      <section class="tool-grid" aria-label="업무 자동화 툴 목록">
-        <button class="tool-card" id="qcToolButton" type="button">
-          <span class="tool-icon">✓</span>
-          <span>
-            <strong>조선 검수 툴</strong>
-            <small>이미지와 라벨 데이터를 빠르게 확인합니다.</small>
-          </span>
-        </button>
-
-        <button class="tool-card muted" type="button" disabled>
-          <span class="tool-icon">+</span>
-          <span>
-            <strong>다음 자동화 툴</strong>
-            <small>준비 중</small>
-          </span>
-        </button>
-      </section>
-
-      <section class="workspace locked" id="workspace">
-        <div>
-          <p class="eyebrow">Shipbuilding QC</p>
-          <h2>조선 검수 툴</h2>
-          <p id="workspaceText">소개 화면을 확인한 뒤 로그인하면 툴이 활성화됩니다.</p>
-        </div>
-        <div class="workspace-actions">
-          <button class="primary" id="startToolButton" type="button" disabled>검수 시작</button>
-        </div>
-      </section>
-    </main>
-
-    <div class="modal-backdrop hidden" id="introModal" role="dialog" aria-modal="true" aria-labelledby="introTitle">
-      <section class="modal intro-modal">
-        <button class="close-button" id="closeIntroButton" type="button" aria-label="소개 닫기">×</button>
-        <div class="carousel">
-          <div class="gif-panel" id="gifPanel">
-            <div class="scan-line"></div>
-            <div class="bbox one"></div>
-            <div class="bbox two"></div>
-            <div class="bbox three"></div>
-          </div>
-          <div class="intro-copy">
-            <p class="eyebrow">Tool Guide</p>
-            <h2 id="introTitle">조선 검수 툴 사용 흐름</h2>
-            <p id="introText">이미지와 라벨 파일을 업로드하고, 클래스와 박스 오류를 한 화면에서 확인합니다.</p>
-            <div class="dots" aria-hidden="true">
-              <span class="dot active"></span>
-              <span class="dot"></span>
-              <span class="dot"></span>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <div class="modal-backdrop hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-      <form class="modal login-modal" id="loginForm">
-        <h2 id="loginTitle">로그인</h2>
-        <label>
-          이메일
-          <input type="email" name="email" placeholder="name@company.com" required />
-        </label>
-        <label>
-          비밀번호
-          <input type="password" name="password" placeholder="••••••••" required />
-        </label>
-        <button class="primary" type="submit">로그인</button>
-      </form>
-    </div>
-
-    <script type="module" src="./script.js"></script>
-  </body>
+        <span class="open-button">Open</span>
+      </a>
+    </section>
+  </main>
+</body>
 </html>
