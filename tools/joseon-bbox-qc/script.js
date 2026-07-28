@@ -3,6 +3,7 @@ const introModal = document.querySelector("#introModal");
 const closeIntroButton = document.querySelector("#closeIntroButton");
 const emailModal = document.querySelector("#emailModal");
 const emailForm = document.querySelector("#emailForm");
+const closeEmailButton = document.querySelector("#closeEmailButton");
 const authStatus = document.querySelector("#authStatus");
 const workspace = document.querySelector("#workspace");
 const workspaceText = document.querySelector("#workspaceText");
@@ -52,6 +53,24 @@ function activateTool() {
   window.location.href = "./app";
 }
 
+async function logEmail(email) {
+  const response = await fetch("/api/email-log", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      email,
+      tool: "joseon-bbox-qc",
+      page: window.location.pathname
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Email log request failed");
+  }
+}
+
 qcToolButton.addEventListener("click", showIntro);
 
 closeIntroButton.addEventListener("click", () => {
@@ -60,12 +79,21 @@ closeIntroButton.addEventListener("click", () => {
   showEmailGate();
 });
 
-emailForm.addEventListener("submit", (event) => {
+closeEmailButton.addEventListener("click", () => {
+  emailModal.classList.add("hidden");
+});
+
+emailForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const emailInput = emailForm.querySelector("input[type='email']");
   if (!emailInput.checkValidity()) {
     emailInput.reportValidity();
     return;
+  }
+  try {
+    await logEmail(emailInput.value.trim());
+  } catch (error) {
+    console.warn(error);
   }
   emailModal.classList.add("hidden");
   activateTool();

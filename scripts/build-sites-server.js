@@ -37,6 +37,7 @@ for (const [path, body] of Object.entries(files)) {
 writeFileSync(
   join(serverDir, "index.js"),
   `const files = ${JSON.stringify(files)};
+const emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
 
 function contentType(pathname) {
   if (pathname.endsWith(".html")) return "text/html; charset=utf-8";
@@ -63,9 +64,43 @@ function serveAsset(pathname) {
   });
 }
 
+async function logEmail(request, env) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return Response.json({ ok: false, error: "invalid_json" }, { status: 400 });
+  }
+
+  const email = String(payload.email || "").trim().toLowerCase();
+  if (!emailPattern.test(email)) {
+    return Response.json({ ok: false, error: "invalid_email" }, { status: 400 });
+  }
+
+  const record = {
+    email,
+    tool: String(payload.tool || "unknown"),
+    page: String(payload.page || ""),
+    createdAt: new Date().toISOString(),
+    userAgent: request.headers.get("user-agent") || ""
+  };
+
+  console.log("email_gate_submit", JSON.stringify(record));
+
+  if (env && env.EMAIL_LOGS) {
+    const key = record.createdAt + "__" + crypto.randomUUID();
+    await env.EMAIL_LOGS.put(key, JSON.stringify(record));
+  }
+
+  return Response.json({ ok: true });
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
+    if (request.method === "POST" && url.pathname === "/api/email-log") {
+      return logEmail(request, env);
+    }
     const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
     return serveAsset(pathname);
   }
