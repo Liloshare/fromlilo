@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>조선 바운딩박스 검수툴</title>
+  <title>Joseon BBox QC</title>
   <style>
     :root {
       --bg: #f3f0fb;
@@ -610,44 +610,218 @@
       .gallery-wrap { height: auto; }
       .toolbar { grid-template-columns: 1fr; }
     }
+
+    :root {
+      color-scheme: dark;
+      --bg: #050505;
+      --panel: #0a0a09;
+      --text: #f3f0e8;
+      --muted: #9a968c;
+      --line: #2a2926;
+      --soft: #12110f;
+      --ink: #f3f0e8;
+      --accent: #f3f0e8;
+      --accent-2: #a7d7b8;
+      --danger: #e58aa0;
+      --warn: #d8b486;
+      --ok: #a7d7b8;
+      --dark: #050505;
+      --dark-rgb: 5, 5, 5;
+      --radius: 0;
+    }
+
+    body {
+      font-family: "Courier New", Courier, "SFMono-Regular", Consolas, monospace;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header,
+    .panel-head,
+    .toolbar,
+    .class-chip-row,
+    .compare-head {
+      background: var(--bg);
+      color: var(--text);
+      border-color: var(--line);
+    }
+
+    header {
+      padding: 18px 20px;
+    }
+
+    h1,
+    .panel-title,
+    .field label,
+    button,
+    .stat .num,
+    .stat .label,
+    .thumb-name,
+    .compare-caption,
+    .meta-key {
+      font-weight: 400;
+    }
+
+    h1 {
+      font-size: 20px;
+      text-transform: uppercase;
+    }
+
+    .header-meta,
+    .hint,
+    .drop span,
+    .thumb-meta,
+    .pos-counter,
+    .stat .label,
+    .field label {
+      color: var(--muted);
+    }
+
+    .panel,
+    .stat,
+    .drop,
+    textarea,
+    select,
+    input[type="text"],
+    input[type="number"],
+    button,
+    .class-chip,
+    .thumb,
+    .compare-issue-form,
+    .compare-panel,
+    .meta-table,
+    .box-row,
+    .check,
+    .issue-row {
+      background: var(--panel);
+      color: var(--text);
+      border-color: var(--line);
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .drop:hover,
+    button:hover,
+    .class-chip:hover {
+      background: #12110f;
+      border-color: #5a5750;
+    }
+
+    .drop.loaded,
+    .class-chip.active,
+    #mainViewToggleBtn.active {
+      background: #111a14;
+      border-color: var(--ok);
+      color: var(--ok);
+    }
+
+    button.primary {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+    }
+
+    button.primary:hover {
+      background: #ffffff;
+      color: var(--bg);
+    }
+
+    button.success {
+      background: transparent;
+      color: var(--ok);
+      border-color: var(--ok);
+    }
+
+    button.danger,
+    .check:has(input:checked),
+    .issue-row {
+      background: #1a0f12;
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .num.ok { color: var(--ok); }
+    .num.warn { color: var(--warn); }
+    .num.err { color: var(--danger); }
+
+    .canvas-frame,
+    .thumb canvas,
+    .compare-panel canvas,
+    .magnifier,
+    .loading-overlay,
+    .compare-modal {
+      background: var(--bg);
+    }
+
+    .thumb:hover,
+    .thumb.active {
+      border-color: var(--text);
+    }
+
+    .thumb.reviewed {
+      border-color: var(--ok);
+    }
+
+    .thumb.issue {
+      border-color: var(--danger);
+    }
+
+    .thumb-order,
+    .thumb.reviewed::before,
+    .thumb.issue::before,
+    .nav-arrow {
+      border-radius: 0;
+      background: var(--soft);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+
+    .meta-key {
+      background: var(--soft);
+    }
+
+    .swatch,
+    .class-chip .chip-swatch {
+      border-radius: 0;
+    }
   </style>
 </head>
 <body>
 <div class="app">
   <header>
-    <h1>조선 바운딩박스 검수툴</h1>
+    <h1>Joseon BBox QC</h1>
     <div class="header-meta">
-      <span id="statusText">이미지 폴더와 YOLO 라벨 폴더를 선택하세요.</span>
+      <span id="statusText">IMAGE / LABEL</span>
     </div>
   </header>
 
   <main class="layout">
     <section class="panel">
       <div class="panel-head">
-        <div class="panel-title">데이터</div>
-        <button onclick="resetAll()">초기화</button>
+        <div class="panel-title">DATA</div>
+        <button onclick="resetAll()">RESET</button>
       </div>
       <div class="panel-body stack">
         <div class="field">
-          <label>원본 이미지 폴더</label>
+          <label>IMAGE</label>
           <div class="drop" id="imageDrop">
-            <strong>이미지 폴더 선택</strong>
-            <span>jpg, jpeg, png 파일을 하위 폴더까지 읽습니다. output 폴더가 있으면 그 안의 이미지만 사용합니다.</span>
+            <strong>SELECT IMAGE</strong>
+            <span>JPG / JPEG / PNG</span>
           </div>
           <input id="imageInput" type="file" webkitdirectory multiple>
         </div>
 
         <div class="field">
-          <label>YOLO 라벨 폴더</label>
+          <label>LABEL</label>
           <div class="drop" id="labelDrop">
-            <strong>라벨 폴더 선택</strong>
-            <span>obj_train_data 안의 txt 또는 직접 선택한 txt를 읽습니다.</span>
+            <strong>SELECT LABEL</strong>
+            <span>YOLO TXT</span>
           </div>
           <input id="labelInput" type="file" webkitdirectory multiple>
         </div>
 
         <div class="field">
-          <label>클래스 목록</label>
+          <label>CLASS</label>
           <textarea id="classInput">0_Burnt
 1_Hume
 2_Point_Burnt
@@ -663,38 +837,38 @@
 12_Blow_hole
 13_Spatter
 14_Weld</textarea>
-          <div class="hint">obj.names 파일이 라벨 폴더에 있으면 자동 반영됩니다. 누락 오류 선택에도 이 목록이 사용됩니다.</div>
+          <div class="hint">OBJ.NAMES / CLASS LIST</div>
         </div>
 
         <div class="btn-row">
-          <button class="primary" id="runBtn" onclick="runValidation()" disabled>검수 시작</button>
-          <button onclick="exportCsv()" id="csvBtn" disabled>엑셀 저장</button>
-          <button onclick="exportJson()" id="jsonBtn" disabled>JSON 저장</button>
+          <button class="primary" id="runBtn" onclick="runValidation()" disabled>RUN</button>
+          <button onclick="exportCsv()" id="csvBtn" disabled>XLSX</button>
+          <button onclick="exportJson()" id="jsonBtn" disabled>JSON</button>
         </div>
 
         <div class="stats">
-          <div class="stat"><div class="num" id="statImages">0</div><div class="label">이미지</div></div>
-          <div class="stat"><div class="num" id="statLabels">0</div><div class="label">라벨</div></div>
-          <div class="stat"><div class="num ok" id="statMatched">0</div><div class="label">매칭</div></div>
-          <div class="stat"><div class="num warn" id="statZero">0</div><div class="label">박스 0개</div></div>
-          <div class="stat"><div class="num warn" id="statDuplicate">0</div><div class="label">중복 파일명</div></div>
-          <div class="stat"><div class="num" id="statBoxes">0</div><div class="label">전체 박스</div></div>
-          <div class="stat"><div class="num err" id="statIssues">0</div><div class="label">검수 오류</div></div>
-          <div class="stat"><div class="num ok" id="statReviewed">0</div><div class="label">검수 완료</div></div>
-          <div class="stat"><div class="num" id="statProgress">0%</div><div class="label">진행률</div></div>
+          <div class="stat"><div class="num" id="statImages">0</div><div class="label">IMG</div></div>
+          <div class="stat"><div class="num" id="statLabels">0</div><div class="label">LBL</div></div>
+          <div class="stat"><div class="num ok" id="statMatched">0</div><div class="label">MATCH</div></div>
+          <div class="stat"><div class="num warn" id="statZero">0</div><div class="label">ZERO</div></div>
+          <div class="stat"><div class="num warn" id="statDuplicate">0</div><div class="label">DUP</div></div>
+          <div class="stat"><div class="num" id="statBoxes">0</div><div class="label">BOX</div></div>
+          <div class="stat"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></div>
+          <div class="stat"><div class="num ok" id="statReviewed">0</div><div class="label">DONE</div></div>
+          <div class="stat"><div class="num" id="statProgress">0%</div><div class="label">RATE</div></div>
         </div>
       </div>
     </section>
 
     <section class="panel">
       <div class="toolbar">
-        <input id="searchInput" type="text" placeholder="파일명 검색">
+        <input id="searchInput" type="text" placeholder="SEARCH">
         <select id="filterSelect" onchange="renderGallery()">
-          <option value="all">전체 이미지</option>
-          <option value="unreviewed">미검수만</option>
-          <option value="issue">오류 입력됨</option>
-          <option value="duplicate">중복 파일명</option>
-          <option value="zero">박스 없음</option>
+          <option value="all">ALL</option>
+          <option value="unreviewed">TODO</option>
+          <option value="issue">ISSUE</option>
+          <option value="duplicate">DUP</option>
+          <option value="zero">ZERO</option>
         </select>
       </div>
       <div class="class-chip-row" id="classChipRow"></div>
@@ -705,57 +879,57 @@
 
     <section class="panel" id="viewerPanel">
       <div class="panel-head">
-        <div class="panel-title">상세 검수</div>
+        <div class="panel-title">REVIEW</div>
         <div class="btn-row">
           <span class="pos-counter" id="posCounter"></span>
-          <button id="mainViewToggleBtn" onclick="toggleMainViewMode()" title="박스 오버레이 / 원본 이미지 전환">원본 보기</button>
-          <button onclick="prevItem()" title="이전 이미지 (←)">이전</button>
-          <button onclick="nextItem()" title="다음 이미지 (→)">다음</button>
-          <button id="fullscreenToggleBtn" onclick="toggleReviewMode()" title="크게 보고 하나씩 넘기며 검수">크게 보기</button>
+          <button id="mainViewToggleBtn" onclick="toggleMainViewMode()" title="VIEW">IMAGE</button>
+          <button onclick="prevItem()" title="PREV">PREV</button>
+          <button onclick="nextItem()" title="NEXT">NEXT</button>
+          <button id="fullscreenToggleBtn" onclick="toggleReviewMode()" title="FOCUS">FOCUS</button>
         </div>
       </div>
       <div class="panel-body viewer">
         <div class="viewer-main">
           <div class="canvas-frame" id="canvasFrame">
-            <button class="nav-arrow nav-prev" id="navPrevBtn" onclick="prevItem()" title="이전 이미지 (←)">‹</button>
+            <button class="nav-arrow nav-prev" id="navPrevBtn" onclick="prevItem()" title="PREV">‹</button>
             <canvas id="mainCanvas"></canvas>
-            <button class="nav-arrow nav-next" id="navNextBtn" onclick="nextItem()" title="다음 이미지 (→)">›</button>
+            <button class="nav-arrow nav-next" id="navNextBtn" onclick="nextItem()" title="NEXT">›</button>
             <div class="magnifier hidden" id="magnifier"><canvas id="magnifierCanvas"></canvas></div>
           </div>
         </div>
 
         <div class="viewer-side">
           <div class="meta-table" id="metaTable">
-            <div class="meta-row"><div class="meta-key">파일</div><div class="meta-val">선택된 이미지 없음</div></div>
+            <div class="meta-row"><div class="meta-key">FILE</div><div class="meta-val">EMPTY</div></div>
           </div>
 
           <div class="field">
-            <label>박스 목록</label>
+            <label>BOX</label>
             <div class="box-list" id="boxList"></div>
           </div>
 
           <div class="issue-form">
             <div class="field">
-              <label>오류 타입</label>
+              <label>ISSUE</label>
               <div class="check-grid" id="issueChecks"></div>
             </div>
             <div class="field" id="missingClassField">
-              <label>누락 클래스</label>
+              <label>MISSING</label>
               <select id="missingClassSelect"></select>
             </div>
             <div class="field">
-              <label>메모</label>
-              <textarea id="noteInput" placeholder="검수 메모를 입력하세요." oninput="updateCurrentIssue()"></textarea>
+              <label>NOTE</label>
+              <textarea id="noteInput" placeholder="NOTE" oninput="updateCurrentIssue()"></textarea>
             </div>
             <div class="btn-row">
-              <button class="success" onclick="markOk()">정상 처리</button>
-              <button class="danger" onclick="clearCurrentIssue()">현재 오류 삭제</button>
+              <button class="success" onclick="markOk()">OK</button>
+              <button class="danger" onclick="clearCurrentIssue()">CLEAR</button>
             </div>
-            <div class="hint">단축키: ←/→ 이전·다음 이미지, Esc 크게 보기 닫기</div>
+            <div class="hint">KEY: LEFT / RIGHT / ESC</div>
           </div>
 
           <div class="field">
-            <label>오류 입력 목록</label>
+            <label>ISSUE LOG</label>
             <div class="issues-list" id="issuesList"></div>
           </div>
         </div>
@@ -767,35 +941,35 @@
 <div class="loading-overlay hidden" id="loadingOverlay">
   <div class="loading-box">
     <div class="spinner"></div>
-    <div id="loadingText">처리 중...</div>
+    <div id="loadingText">LOADING</div>
   </div>
 </div>
 
 <div class="compare-modal hidden" id="compareModal">
   <div class="compare-head">
-    <div class="panel-title" id="compareTitle">중복 파일 비교</div>
-    <button onclick="closeCompareView()">닫기 (Esc)</button>
+    <div class="panel-title" id="compareTitle">DUP COMPARE</div>
+    <button onclick="closeCompareView()">CLOSE</button>
   </div>
   <div class="compare-body">
     <div class="compare-grid" id="compareGrid"></div>
     <div class="compare-issue-form">
       <div class="field">
-        <label>오류 타입</label>
+        <label>ISSUE</label>
         <div class="check-grid" id="compareIssueChecks"></div>
       </div>
       <div class="field">
-        <label>누락 클래스</label>
+        <label>MISSING</label>
         <select id="compareMissingClassSelect"></select>
       </div>
       <div class="field">
-        <label>메모</label>
-        <textarea id="compareNoteInput" placeholder="어느 라벨을 써야 할지, 무엇이 문제인지 메모하세요." oninput="updateCompareIssue()"></textarea>
+        <label>NOTE</label>
+        <textarea id="compareNoteInput" placeholder="NOTE" oninput="updateCompareIssue()"></textarea>
       </div>
       <div class="btn-row">
-        <button class="success" onclick="markCompareOk()">정상 처리</button>
-        <button class="danger" onclick="clearCompareIssue()">현재 오류 삭제</button>
+        <button class="success" onclick="markCompareOk()">OK</button>
+        <button class="danger" onclick="clearCompareIssue()">CLEAR</button>
       </div>
-      <div class="hint">이 오류는 중복 파일 그룹 전체에 기록되며, 엑셀 저장 시 "중복 파일명" 탭에 별도로 포함됩니다.</div>
+      <div class="hint">DUP GROUP / XLSX TAB</div>
     </div>
   </div>
 </div>
@@ -804,14 +978,14 @@
 const PAGE_LIMIT = 1000;
 const DEFAULT_COLORS = ['#f2867a','#6f9ce0','#5fb3a3','#f0b45c','#a685e8','#e87aa8','#6cbf7f','#5fb8cc','#ef9a5c','#8b85e8','#b3d967','#cc7070','#6ecfbe','#f5d76e','#9aa3b8'];
 const ISSUE_TYPES = [
-  ['wrong_class', '클래스 오류'],
-  ['wrong_box', '박스 위치/크기 오류'],
-  ['missing', '누락'],
-  ['duplicate', '중복'],
-  ['unnecessary', '불필요 박스'],
-  ['unclear', '판단 어려움'],
-  ['zero_box_check', '박스 없음 확인'],
-  ['other', '기타']
+  ['wrong_class', 'CLASS'],
+  ['wrong_box', 'BBOX'],
+  ['missing', 'MISSING'],
+  ['duplicate', 'DUP'],
+  ['unnecessary', 'DELETE'],
+  ['unclear', 'UNCLEAR'],
+  ['zero_box_check', 'ZERO'],
+  ['other', 'ETC']
 ];
 
 let imageFiles = [];
@@ -934,8 +1108,8 @@ function handleImages(files) {
   const outputOnly = all.filter(f => filePath(f).split(/[\\/]/).includes('output'));
   imageFiles = outputOnly.length ? outputOnly : all;
   imageDrop.classList.add('loaded');
-  imageDrop.querySelector('strong').textContent = `${imageFiles.length}개 이미지`;
-  imageDrop.querySelector('span').textContent = outputOnly.length ? `output 폴더 이미지만 사용 (전체 ${all.length}개 중)` : '선택 완료';
+  imageDrop.querySelector('strong').textContent = `IMG ${imageFiles.length}`;
+  imageDrop.querySelector('span').textContent = outputOnly.length ? `OUTPUT / ${all.length}` : 'LOADED';
   checkReady();
 }
 
@@ -952,8 +1126,8 @@ async function handleLabels(files) {
     renderClassControls();
   }
   labelDrop.classList.add('loaded');
-  labelDrop.querySelector('strong').textContent = `${labelFiles.length}개 라벨`;
-  labelDrop.querySelector('span').textContent = objNames ? 'obj.names 자동 반영됨' : '선택 완료';
+  labelDrop.querySelector('strong').textContent = `LBL ${labelFiles.length}`;
+  labelDrop.querySelector('span').textContent = objNames ? 'OBJ.NAMES' : 'LOADED';
   checkReady();
 }
 
@@ -982,7 +1156,7 @@ function runValidation() {
   activeBoxIndex = -1;
   mainImageCache = new Map();
   thumbBitmapCache = new Map();
-  showLoading('이미지·라벨 매칭 중...');
+  showLoading('MATCHING');
 
   for (const file of imageFiles) {
     const key = normalizedStem(file.name);
@@ -1019,12 +1193,12 @@ function runValidation() {
     });
   }
 
-  document.getElementById('loadingText').textContent = `라벨 분석 중... (0/${records.length})`;
+  document.getElementById('loadingText').textContent = `PARSE 0/${records.length}`;
   let parsed = 0;
   Promise.all(records.map(r => parseRecord(r).then(() => {
     parsed++;
     if (parsed % 25 === 0 || parsed === records.length) {
-      document.getElementById('loadingText').textContent = `라벨 분석 중... (${parsed}/${records.length})`;
+      document.getElementById('loadingText').textContent = `PARSE ${parsed}/${records.length}`;
     }
   }))).then(() => {
     // Stable review order (#1, #2, ...) assigned once over the reviewable set
@@ -1051,7 +1225,7 @@ function runValidation() {
     }
     document.getElementById('csvBtn').disabled = false;
     document.getElementById('jsonBtn').disabled = false;
-    document.getElementById('statusText').textContent = '검수 데이터를 불러왔습니다.';
+    document.getElementById('statusText').textContent = 'READY';
     hideLoading();
   });
 }
@@ -1090,7 +1264,7 @@ let currentCompareRecord = null;
 async function openCompareView(record) {
   currentCompareRecord = record;
   const variants = record.labelVariants || [];
-  document.getElementById('compareTitle').textContent = `중복 파일 비교 — ${record.baseName}`;
+  document.getElementById('compareTitle').textContent = `DUP — ${record.baseName}`;
   const grid = document.getElementById('compareGrid');
   grid.innerHTML = '';
   document.getElementById('compareModal').classList.remove('hidden');
@@ -1099,7 +1273,7 @@ async function openCompareView(record) {
   for (const variant of variants) {
     const panel = document.createElement('div');
     panel.className = 'compare-panel';
-    panel.innerHTML = `<canvas></canvas><div class="compare-caption">${escapeHtml(variant.source)} — ${variant.boxCount}박스</div>`;
+    panel.innerHTML = `<canvas></canvas><div class="compare-caption">${escapeHtml(variant.source)} — ${variant.boxCount} BOX</div>`;
     grid.appendChild(panel);
     const canvas = panel.querySelector('canvas');
     const imageFile = findImageForSource(record, variant.source);
@@ -1189,14 +1363,14 @@ async function parseBoxesFromFile(file) {
   for (let i = 0; i < lines.length; i++) {
     const parts = lines[i].split(/\s+/);
     if (parts.length !== 5) {
-      parseError = `라벨 ${i + 1}행 형식 오류`;
+      parseError = `LABEL ${i + 1} FORMAT`;
       continue;
     }
     const [cidRaw, xcRaw, ycRaw, wRaw, hRaw] = parts;
     const classId = Number(cidRaw);
     const xc = Number(xcRaw), yc = Number(ycRaw), bw = Number(wRaw), bh = Number(hRaw);
     if (![classId, xc, yc, bw, bh].every(Number.isFinite)) {
-      parseError = `라벨 ${i + 1}행 숫자 오류`;
+      parseError = `LABEL ${i + 1} NUMBER`;
       continue;
     }
     const className = classes[classId] || String(classId);
@@ -1251,7 +1425,7 @@ function renderClassControls() {
 
   const row = document.getElementById('classChipRow');
   row.innerHTML = '';
-  row.appendChild(buildClassChip('__all__', '전체'));
+  row.appendChild(buildClassChip('__all__', 'ALL'));
   all.forEach(name => row.appendChild(buildClassChip(name, name, classColors[name])));
 
   renderMissingClassOptions();
@@ -1269,7 +1443,7 @@ function buildClassChip(value, label, color) {
 function renderMissingClassOptions() {
   ['missingClassSelect', 'compareMissingClassSelect'].forEach(id => {
     const select = document.getElementById(id);
-    select.innerHTML = '<option value="">선택 안 함</option>';
+    select.innerHTML = '<option value="">NONE</option>';
     classes.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
@@ -1324,8 +1498,8 @@ function thumbClassName(record) {
 function thumbOrderLabel(record) {
   if (record.isVariant) return record.variantSource;
   if (record.order) return `#${record.order}`;
-  if (isDuplicate(record)) return '중복';
-  if (record.status === 'matched' && record.boxes.length === 0) return '0박스';
+  if (isDuplicate(record)) return 'DUP';
+  if (record.status === 'matched' && record.boxes.length === 0) return 'ZERO';
   return '-';
 }
 
@@ -1369,7 +1543,7 @@ function renderGallery() {
   const isDuplicateView = document.getElementById('filterSelect').value === 'duplicate';
   const rows = isDuplicateView ? duplicateVariantRows() : filteredRecords();
   if (!rows.length) {
-    gallery.innerHTML = '<div class="gallery-empty">조건에 맞는 이미지가 없습니다.</div>';
+    gallery.innerHTML = '<div class="gallery-empty">EMPTY</div>';
     return;
   }
 
@@ -1441,7 +1615,7 @@ async function drawThumbCanvas(record, canvas) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#ffffff';
     ctx.font = '18px sans-serif';
-    ctx.fillText('원본 이미지 누락', 18, 34);
+    ctx.fillText('NO IMAGE', 18, 34);
     return;
   }
   const bitmap = await loadThumbBitmap(record.imageFile);
@@ -1557,7 +1731,7 @@ function prefetchNeighbors(index) {
 
 function enterReviewMode() {
   document.getElementById('viewerPanel').classList.add('viewer-fullscreen');
-  document.getElementById('fullscreenToggleBtn').textContent = '닫기 (Esc)';
+    document.getElementById('fullscreenToggleBtn').textContent = 'CLOSE';
   document.body.style.overflow = 'hidden';
 }
 
@@ -1565,7 +1739,7 @@ function exitReviewMode() {
   const panel = document.getElementById('viewerPanel');
   if (!panel.classList.contains('viewer-fullscreen')) return;
   panel.classList.remove('viewer-fullscreen');
-  document.getElementById('fullscreenToggleBtn').textContent = '크게 보기';
+    document.getElementById('fullscreenToggleBtn').textContent = 'FOCUS';
   document.body.style.overflow = '';
 }
 
@@ -1592,17 +1766,17 @@ async function renderCurrent() {
   if (!record) {
     canvas.width = 1; canvas.height = 1;
     boxList.innerHTML = '';
-    document.getElementById('metaTable').innerHTML = '<div class="meta-row"><div class="meta-key">파일</div><div class="meta-val">선택된 이미지 없음</div></div>';
+    document.getElementById('metaTable').innerHTML = '<div class="meta-row"><div class="meta-key">FILE</div><div class="meta-val">EMPTY</div></div>';
     return;
   }
   await renderCanvas(canvas, record, 1200, true);
   magnifierImg = record.imageFile ? await loadImage(record.imageFile) : null;
   renderMeta(record);
-  boxList.innerHTML = record.boxes.length ? '' : '<div class="hint">박스가 없습니다.</div>';
+  boxList.innerHTML = record.boxes.length ? '' : '<div class="hint">NO BOX</div>';
   record.boxes.forEach((box, idx) => {
     const row = document.createElement('div');
     row.className = 'box-row';
-    row.innerHTML = `<span class="swatch" style="background:${classColors[box.className] || '#a8a4bd'}"></span><span>${idx + 1}. ${escapeHtml(box.className)}</span><button>선택</button>`;
+    row.innerHTML = `<span class="swatch" style="background:${classColors[box.className] || '#a8a4bd'}"></span><span>${idx + 1}. ${escapeHtml(box.className)}</span><button>SEL</button>`;
     row.querySelector('button').addEventListener('click', () => {
       activeBoxIndex = idx;
       renderCurrent();
@@ -1620,7 +1794,7 @@ async function renderCanvas(canvas, record, maxWidth, isMain = false) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#ffffff';
     ctx.font = '18px sans-serif';
-    ctx.fillText('원본 이미지 누락', 18, 34);
+    ctx.fillText('NO IMAGE', 18, 34);
     return;
   }
   const img = await loadImage(record.imageFile);
@@ -1645,7 +1819,7 @@ function toggleMainViewMode() {
 
 function updateMainViewToggleBtn() {
   const btn = document.getElementById('mainViewToggleBtn');
-  btn.textContent = mainViewMode === 'overlay' ? '원본 보기' : '오버레이 보기';
+  btn.textContent = mainViewMode === 'overlay' ? 'IMAGE' : 'OVERLAY';
   btn.classList.toggle('active', mainViewMode === 'image');
 }
 
@@ -1761,25 +1935,25 @@ initMagnifier();
 
 function renderMeta(record) {
   const rows = [
-    ['순서', record.order ? `${record.order} / ${reviewableTotal}` : '-'],
-    ['파일', record.baseName],
-    ['상태', statusLabel(record)],
-    ['라벨', record.labelFile ? filePath(record.labelFile) : '누락'],
-    ['이미지', record.imageFile ? filePath(record.imageFile) : '누락'],
-    ['크기', record.imageSize ? `${record.imageSize.width} x ${record.imageSize.height}` : '-'],
-    ['박스', String(record.boxes.length)],
-    ['파싱', record.parseError || '정상']
+    ['NO', record.order ? `${record.order} / ${reviewableTotal}` : '-'],
+    ['FILE', record.baseName],
+    ['STATUS', statusLabel(record)],
+    ['LABEL', record.labelFile ? filePath(record.labelFile) : 'MISSING'],
+    ['IMAGE', record.imageFile ? filePath(record.imageFile) : 'MISSING'],
+    ['SIZE', record.imageSize ? `${record.imageSize.width} x ${record.imageSize.height}` : '-'],
+    ['BOX', String(record.boxes.length)],
+    ['PARSE', record.parseError || 'OK']
   ].map(([k, v]) => `<div class="meta-row"><div class="meta-key">${k}</div><div class="meta-val">${escapeHtml(v)}</div></div>`).join('');
 
   let dupRow = '';
   if (isDuplicate(record)) {
     const parts = [];
-    if (record.duplicateImages > 0) parts.push(`이미지 파일 ${record.duplicateImages + 1}개 동일 파일명`);
+    if (record.duplicateImages > 0) parts.push(`IMG DUP ${record.duplicateImages + 1}`);
     if (record.labelVariants) {
-      const variantText = record.labelVariants.map(v => `${escapeHtml(v.source)}: ${v.boxCount}박스`).join('<br>');
+      const variantText = record.labelVariants.map(v => `${escapeHtml(v.source)}: ${v.boxCount} BOX`).join('<br>');
       parts.push(variantText);
     }
-    dupRow = `<div class="meta-row"><div class="meta-key">중복</div><div class="meta-val">${parts.join('<br>')}</div></div>`;
+    dupRow = `<div class="meta-row"><div class="meta-key">DUP</div><div class="meta-val">${parts.join('<br>')}</div></div>`;
   }
 
   document.getElementById('metaTable').innerHTML = rows + dupRow;
@@ -1846,13 +2020,13 @@ function renderIssuesList() {
   const list = document.getElementById('issuesList');
   const rows = Array.from(issueMap.values());
   if (!rows.length) {
-    list.innerHTML = '<div class="hint">입력된 오류가 없습니다.</div>';
+    list.innerHTML = '<div class="hint">NO ISSUE</div>';
     return;
   }
   list.innerHTML = rows.map(issue => `
     <div class="issue-row">
       <strong>${escapeHtml(issue.file)}</strong>
-      <span>${escapeHtml(issue.types.join(', ') || '-')} ${issue.missingClass ? ' / 누락: ' + escapeHtml(issue.missingClass) : ''}</span>
+      <span>${escapeHtml(issue.types.join(', ') || '-')} ${issue.missingClass ? ' / MISSING: ' + escapeHtml(issue.missingClass) : ''}</span>
       ${issue.note ? `<span>${escapeHtml(issue.note)}</span>` : ''}
     </div>
   `).join('');
@@ -2124,11 +2298,11 @@ function loadImage(file) {
 }
 
 function statusLabel(record) {
-  if (record.status === 'missing-image') return '이미지 누락';
-  if (record.status === 'missing-label') return '라벨 누락';
-  if (record.duplicateImages || record.duplicateLabels) return '중복 있음';
-  if (record.parseError) return '라벨 오류';
-  return '매칭';
+  if (record.status === 'missing-image') return 'NO IMG';
+  if (record.status === 'missing-label') return 'NO LBL';
+  if (record.duplicateImages || record.duplicateLabels) return 'DUP';
+  if (record.parseError) return 'LBL ERR';
+  return 'MATCH';
 }
 
 function resetAll() {
@@ -2157,10 +2331,10 @@ function resetAll() {
   labelInput.value = '';
   imageDrop.classList.remove('loaded');
   labelDrop.classList.remove('loaded');
-  imageDrop.querySelector('strong').textContent = '이미지 폴더 선택';
-  imageDrop.querySelector('span').textContent = 'jpg, jpeg, png 파일을 하위 폴더까지 읽습니다. output 폴더가 있으면 그 안의 이미지만 사용합니다.';
-  labelDrop.querySelector('strong').textContent = '라벨 폴더 선택';
-  labelDrop.querySelector('span').textContent = 'obj_train_data 안의 txt 또는 직접 선택한 txt를 읽습니다.';
+  imageDrop.querySelector('strong').textContent = 'SELECT IMAGE';
+  imageDrop.querySelector('span').textContent = 'JPG / JPEG / PNG';
+  labelDrop.querySelector('strong').textContent = 'SELECT LABEL';
+  labelDrop.querySelector('span').textContent = 'YOLO TXT';
   runBtn.disabled = true;
   document.getElementById('csvBtn').disabled = true;
   document.getElementById('jsonBtn').disabled = true;
@@ -2169,7 +2343,7 @@ function resetAll() {
   document.getElementById('mainCanvas').width = 1;
   document.getElementById('mainCanvas').height = 1;
   document.getElementById('posCounter').textContent = '';
-  document.getElementById('statusText').textContent = '이미지 폴더와 YOLO 라벨 폴더를 선택하세요.';
+  document.getElementById('statusText').textContent = 'IMAGE / LABEL';
   renderStats();
   renderIssuesList();
 }
