@@ -960,16 +960,17 @@
 
         <div class="field">
           <label>CLASS</label>
-          <div class="class-summary">
-            <span id="classSummary">15 CLASS</span>
-            <button type="button" onclick="openClassEditor()">EDIT</button>
-          </div>
           <div class="class-preset-row">
             <select id="classPresetSelect">
               <option value="">PROJECT CLASS</option>
               <option value="ship_task1">ship task1</option>
+              <option value="ship_task2">ship task2</option>
             </select>
             <button type="button" onclick="applyClassPreset()">LOAD</button>
+          </div>
+          <div class="class-summary">
+            <span id="classSummary">15 CLASS</span>
+            <button type="button" onclick="openClassEditor()">EDIT</button>
           </div>
           <textarea id="classInput"></textarea>
           <div class="hint">OBJ.NAMES / CLASS LIST</div>
@@ -1128,20 +1129,28 @@ const DEFAULT_COLORS = ['#f2867a','#6f9ce0','#5fb3a3','#f0b45c','#a685e8','#e87a
 const CLASS_PRESETS = {
   ship_task1: [
     'burnt',
+    'hume',
+    'point_burnt',
+    'point_hume',
+    'rust',
+    'rust_area',
+    'point_rust',
+    'chalk',
+    'feathering',
+    'zinc',
     'oil',
+    'm/d',
     'blowhole',
     'spatter',
-    'scratch',
-    'dent',
-    'crack',
-    'rust',
-    'slag',
-    'undercut',
-    'overlap',
-    'pit',
+    'weld'
+  ],
+  ship_task2: [
     'contamination',
-    'deformation',
-    'etc'
+    'drop',
+    'damage',
+    'sagging',
+    'pinhole',
+    'light reflection'
   ]
 };
 const ISSUE_TYPES = [
