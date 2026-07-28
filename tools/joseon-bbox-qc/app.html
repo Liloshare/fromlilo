@@ -852,7 +852,7 @@
 
     .class-edit-row {
       display: grid;
-      grid-template-columns: 48px 18px 1fr;
+      grid-template-columns: 48px 30px 1fr;
       gap: 10px;
       align-items: center;
     }
@@ -863,6 +863,15 @@
 
     .class-edit-row input {
       min-width: 0;
+    }
+
+    .class-edit-row input[type="color"] {
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid var(--line);
+      background: transparent;
+      cursor: pointer;
     }
 
     .box-class-once {
@@ -1218,12 +1227,13 @@ function openClassEditor() {
   const list = document.getElementById('classEditList');
   list.innerHTML = '';
   classes.forEach((name, idx) => {
+    const color = classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
     const row = document.createElement('div');
     row.className = 'class-edit-row';
     row.innerHTML = `
       <code>${idx}</code>
-      <span class="swatch" style="background:${classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length]}"></span>
-      <input type="text" value="${escapeHtml(name)}" data-class-index="${idx}">
+      <input type="color" value="${color}" data-class-color="${idx}" title="COLOR">
+      <input type="text" value="${escapeHtml(name)}" data-class-name="${idx}">
     `;
     list.appendChild(row);
   });
@@ -1236,14 +1246,16 @@ function closeClassEditor() {
 
 function applyClassEditor() {
   const previous = [...classes];
-  const next = Array.from(document.querySelectorAll('#classEditList input'))
+  const nameInputs = Array.from(document.querySelectorAll('#classEditList input[data-class-name]'));
+  const colorInputs = Array.from(document.querySelectorAll('#classEditList input[data-class-color]'));
+  const next = nameInputs
     .map(input => input.value.trim())
     .filter(Boolean);
   if (!next.length) return;
 
   const nextColors = {};
   next.forEach((name, idx) => {
-    nextColors[name] = classColors[previous[idx]] || classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+    nextColors[name] = colorInputs[idx]?.value || classColors[previous[idx]] || classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
   });
   classColors = nextColors;
   document.getElementById('classInput').value = next.join('\n');
@@ -2013,15 +2025,21 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     ctx.fillRect(x, y, bw, bh);
     ctx.globalAlpha = 1;
     ctx.shadowColor = color;
-    ctx.shadowBlur = idx === activeBoxIndex ? 14 : 8;
-    ctx.lineWidth = isMain ? (idx === activeBoxIndex ? 2 : 1) : (idx === activeBoxIndex ? 3 : 1);
+    ctx.shadowBlur = idx === activeBoxIndex ? 16 : 10;
+    ctx.lineWidth = idx === activeBoxIndex ? 3 : 2;
     ctx.strokeStyle = idx === activeBoxIndex ? '#ffffff' : color;
     ctx.strokeRect(x, y, bw, bh);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.72;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.82)';
+    ctx.strokeRect(x - 1, y - 1, bw + 2, bh + 2);
+    ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
     const shouldLabel = !labeledClasses.has(box.className);
     if (shouldLabel && (isMain || canvasW > 300)) {
       labeledClasses.add(box.className);
-      const label = `${idx + 1} ${box.className}`;
+      const label = box.className;
       ctx.font = `${Math.max(10, Math.round(canvasW / 72))}px "Courier New", monospace`;
       const tw = ctx.measureText(label).width;
       const th = Math.max(14, Math.round(canvasW / 58));
@@ -2105,11 +2123,16 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     const w = box.bw * imgW * scaleX;
     const h = box.bh * imgH * scaleY;
     ctx.shadowColor = color;
-    ctx.shadowBlur = idx === activeBoxIndex ? 12 : 7;
-    ctx.lineWidth = idx === activeBoxIndex ? 2 : 1;
+    ctx.shadowBlur = idx === activeBoxIndex ? 14 : 9;
+    ctx.lineWidth = idx === activeBoxIndex ? 3 : 2;
     ctx.strokeStyle = idx === activeBoxIndex ? '#ffffff' : color;
     ctx.strokeRect(x, y, w, h);
     ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.72;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.82)';
+    ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+    ctx.globalAlpha = 1;
   });
   ctx.restore();
 }
