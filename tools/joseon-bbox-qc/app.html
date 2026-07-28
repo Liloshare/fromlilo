@@ -574,10 +574,16 @@
       border-radius: 6px;
       padding: 7px 8px;
       display: grid;
-      grid-template-columns: 18px 1fr auto;
+      grid-template-columns: 18px 1fr;
       gap: 8px;
       align-items: center;
       font-size: 12px;
+    }
+    .box-row .btn-row { grid-column: 1 / -1; }
+    .box-row button.active {
+      border-color: #f3f0e8;
+      color: #050505;
+      background: #f3f0e8;
     }
 
     .issues-list {
@@ -593,9 +599,27 @@
       padding: 8px;
       font-size: 12px;
       display: grid;
-      gap: 4px;
+      grid-template-columns: 1fr auto;
+      gap: 4px 8px;
     }
     .issue-row strong { overflow-wrap: anywhere; }
+    .issue-row-main {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .issue-actions {
+      display: flex;
+      gap: 4px;
+      align-items: start;
+    }
+    .issue-actions button {
+      min-height: 0;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      line-height: 1;
+    }
 
     .hint {
       color: var(--muted);
@@ -999,17 +1023,17 @@
             </div>
             <div class="field" id="missingClassField">
               <label>MISSING</label>
-              <select id="missingClassSelect"></select>
+              <select id="missingClassSelect" onchange="updateCurrentIssue()"></select>
             </div>
             <div class="field">
               <label>NOTE</label>
               <textarea id="noteInput" placeholder="NOTE" oninput="updateCurrentIssue()"></textarea>
             </div>
             <div class="btn-row">
-              <button class="success" onclick="markOk()">OK</button>
               <button class="danger" onclick="clearCurrentIssue()">CLEAR</button>
+              <button class="success" onclick="markOk()">SAVE</button>
             </div>
-            <div class="hint">KEY: LEFT / RIGHT / ESC</div>
+            <div class="hint">KEY: LEFT / RIGHT / CTRL|CMD</div>
           </div>
 
           <div class="field">
@@ -1075,14 +1099,11 @@
 const PAGE_LIMIT = 1000;
 const DEFAULT_COLORS = ['#f2867a','#6f9ce0','#5fb3a3','#f0b45c','#a685e8','#e87aa8','#6cbf7f','#5fb8cc','#ef9a5c','#8b85e8','#b3d967','#cc7070','#6ecfbe','#f5d76e','#9aa3b8'];
 const ISSUE_TYPES = [
-  ['wrong_class', 'CLASS'],
-  ['wrong_box', 'BBOX'],
+  ['wrong_class', 'WRONG CLASS'],
+  ['wrong_box', 'SIZE'],
   ['missing', 'MISSING'],
   ['duplicate', 'DUP'],
-  ['unnecessary', 'DELETE'],
-  ['unclear', 'UNCLEAR'],
-  ['zero_box_check', 'ZERO'],
-  ['other', 'ETC']
+  ['unnecessary', 'DELETE']
 ];
 
 let imageFiles = [];
@@ -1102,6 +1123,7 @@ let issueMap = new Map();
 let reviewedSet = new Set();
 let objectUrlCache = new Map();
 let activeBoxIndex = -1;
+let issueTarget = null;
 
 // review-mode ("하나씩 넘기기") navigation queue, snapshot of the filtered list at the
 // moment review mode was entered so marking a record OK/issue doesn't yank it out from
@@ -1144,20 +1166,32 @@ function recordSource(record) {
 
 function actionFromIssue(issue) {
   if (!issue) return 'approved';
-  return issue.types?.length ? issue.types.join('|') : issue.missingClass ? 'missing' : issue.note ? 'note' : 'issue';
+  const entries = issue.issues || [issue];
+  return entries.flatMap(entry => entry.types || []).join('|') || 'issue';
+}
+
+function summarizeIssue(issue) {
+  const entries = issue?.issues || (issue ? [issue] : []);
+  return {
+    types: Array.from(new Set(entries.flatMap(entry => entry.types || []))).join('|'),
+    missingClass: entries.map(entry => entry.missingClass).filter(Boolean).join('|'),
+    note: entries.map(entry => entry.note).filter(Boolean).join(' | ')
+  };
 }
 
 async function saveReviewResult(record, action, issue = null) {
   if (!record || !userEmail) return;
   const source = recordSource(record);
+  const issueEntries = issue?.issues || (issue ? [issue] : []);
+  const issueTypes = Array.from(new Set(issueEntries.flatMap(entry => entry.types || [])));
   const payload = {
     userEmail,
     ...source,
     annotationFilename: record.labelFile?.name || '',
     action,
-    note: issue?.note || '',
-    issueTypes: issue?.types || [],
-    missingClass: issue?.missingClass || '',
+    note: issueEntries.map(entry => entry.note).filter(Boolean).join(' | '),
+    issueTypes,
+    missingClass: issueEntries.map(entry => entry.missingClass).filter(Boolean).join('|'),
     boxCount: record.boxes?.length || 0,
     status: record.status || ''
   };
@@ -1174,6 +1208,64 @@ async function saveReviewResult(record, action, issue = null) {
   }
 }
 const runBtn = document.getElementById('runBtn');
+
+function getRecordIssue(record) {
+  if (!record) return null;
+  const issue = issueMap.get(record.id);
+  if (!issue) return null;
+  if (issue.issues) return issue;
+  return { id: record.id, file: record.baseName, issues: [issue], boxCount: record.boxes.length, status: record.status };
+}
+
+function setRecordIssues(record, issues) {
+  if (!record) return;
+  if (!issues.length) {
+    issueMap.delete(record.id);
+    return;
+  }
+  issueMap.set(record.id, {
+    id: record.id,
+    file: record.baseName,
+    issues,
+    boxCount: record.boxes.length,
+    status: record.status
+  });
+}
+
+function targetKey(target) {
+  if (!target) return 'image';
+  if (target.type === 'box') return `box:${target.boxIndex}`;
+  if (target.type === 'class') return `class:${target.className}`;
+  return target.type || 'image';
+}
+
+function targetLabel(target) {
+  if (!target) return 'IMAGE';
+  if (target.type === 'box') return `BOX ${target.boxIndex + 1}`;
+  if (target.type === 'class') return `CLASS ${target.className}`;
+  return 'IMAGE';
+}
+
+function upsertIssue(record, entry, persist = true) {
+  const current = getRecordIssue(record)?.issues || [];
+  const key = entry.targetKey;
+  const next = current.filter(item => item.targetKey !== key);
+  next.push(entry);
+  setRecordIssues(record, next);
+  if (persist) saveReviewResult(record, actionFromIssue(getRecordIssue(record)), getRecordIssue(record));
+}
+
+function removeIssue(recordId, key) {
+  const record = records.find(item => item.id === recordId);
+  if (!record) return;
+  const current = getRecordIssue(record)?.issues || [];
+  const next = current.filter(item => item.targetKey !== key);
+  setRecordIssues(record, next);
+  saveReviewResult(record, next.length ? actionFromIssue(getRecordIssue(record)) : 'cleared', getRecordIssue(record));
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
+}
 
 imageDrop.addEventListener('click', () => imageInput.click());
 labelDrop.addEventListener('click', () => labelInput.click());
@@ -1342,6 +1434,32 @@ function readClassInput() {
   renderMissingClassOptions();
 }
 
+function autoDetectDuplicateBoxes() {
+  records.forEach(record => {
+    if (record.status !== 'matched' || !record.boxes.length) return;
+    const seen = new Map();
+    record.boxes.forEach((box, idx) => {
+      const coordKey = [box.className, box.xc, box.yc, box.bw, box.bh]
+        .map(value => typeof value === 'number' ? value.toFixed(6) : value)
+        .join('|');
+      if (!seen.has(coordKey)) {
+        seen.set(coordKey, idx);
+        return;
+      }
+      const firstIdx = seen.get(coordKey);
+      const target = { type: 'box', boxIndex: idx, className: box.className };
+      upsertIssue(record, {
+        target,
+        targetKey: targetKey(target),
+        targetLabel: targetLabel(target),
+        types: ['duplicate'],
+        missingClass: '',
+        note: `DUP BOX ${firstIdx + 1}`
+      }, false);
+    });
+  });
+}
+
 async function runValidation() {
   if (!classes.length) await buildClassesFromLabelFiles();
   readClassInput();
@@ -1353,6 +1471,7 @@ async function runValidation() {
   imageMap = new Map();
   labelMap = new Map();
   activeBoxIndex = -1;
+  issueTarget = null;
   mainImageCache = new Map();
   thumbBitmapCache = new Map();
   showLoading('MATCHING');
@@ -1400,6 +1519,7 @@ async function runValidation() {
       document.getElementById('loadingText').textContent = `PARSE ${parsed}/${records.length}`;
     }
   }))).then(() => {
+    autoDetectDuplicateBoxes();
     // Stable review order (#1, #2, ...) assigned once over the reviewable set
     // (matched + has boxes) in filename order — doesn't shift when the user
     // later filters/searches, so it can be used to find where a paused
@@ -1507,10 +1627,11 @@ function buildCompareIssueChecks() {
 buildCompareIssueChecks();
 
 function loadCompareIssueForm(record) {
-  const issue = issueMap.get(record.id);
-  document.querySelectorAll('#compareIssueChecks input').forEach(input => input.checked = issue?.types?.includes(input.value) || false);
-  document.getElementById('compareMissingClassSelect').value = issue?.missingClass || '';
-  document.getElementById('compareNoteInput').value = issue?.note || '';
+  const issue = getRecordIssue(record);
+  const entry = issue?.issues?.find(item => item.targetKey === 'image') || issue?.issues?.[0] || null;
+  document.querySelectorAll('#compareIssueChecks input').forEach(input => input.checked = entry?.types?.includes(input.value) || false);
+  document.getElementById('compareMissingClassSelect').value = entry?.missingClass || '';
+  document.getElementById('compareNoteInput').value = entry?.note || '';
 }
 
 function updateCompareIssue() {
@@ -1519,9 +1640,16 @@ function updateCompareIssue() {
   const types = Array.from(document.querySelectorAll('#compareIssueChecks input:checked')).map(i => i.value);
   const missingClass = document.getElementById('compareMissingClassSelect').value;
   const note = document.getElementById('compareNoteInput').value.trim();
-  if (!types.length && !missingClass && !note) issueMap.delete(record.id);
-  else issueMap.set(record.id, { id: record.id, file: record.baseName, types, missingClass, note, boxCount: record.boxes.length, status: record.status });
-  saveReviewResult(record, actionFromIssue(issueMap.get(record.id)), issueMap.get(record.id) || null);
+  const target = { type: 'image' };
+  if (!types.length && !missingClass && !note) removeIssue(record.id, targetKey(target));
+  else upsertIssue(record, {
+    target,
+    targetKey: targetKey(target),
+    targetLabel: targetLabel(target),
+    types,
+    missingClass: types.includes('missing') ? missingClass : '',
+    note
+  });
   renderStats();
   renderIssuesList();
   updateGalleryHighlights();
@@ -1599,13 +1727,14 @@ function renderStats() {
   const duplicate = records.filter(r => r.status === 'matched' && isDuplicate(r)).length;
   const boxes = records.reduce((sum, r) => sum + r.boxes.length, 0);
   const reviewed = records.filter(r => r.status === 'matched' && (reviewedSet.has(r.id) || issueMap.has(r.id))).length;
+  const issueCount = Array.from(issueMap.values()).reduce((sum, issue) => sum + (issue.issues?.length || (issue.types?.length ? 1 : 0)), 0);
   document.getElementById('statImages').textContent = imageFiles.length;
   document.getElementById('statLabels').textContent = labelFiles.length;
   document.getElementById('statMatched').textContent = matched;
   document.getElementById('statZero').textContent = zero;
   document.getElementById('statDuplicate').textContent = duplicate;
   document.getElementById('statBoxes').textContent = boxes;
-  document.getElementById('statIssues').textContent = issueMap.size;
+  document.getElementById('statIssues').textContent = issueCount;
   document.getElementById('statReviewed').textContent = reviewed;
   document.getElementById('statProgress').textContent = matched ? `${Math.round(reviewed / matched * 100)}%` : '0%';
 }
@@ -1866,7 +1995,9 @@ function selectRecord(index) {
   if (index < 0 || index >= records.length) return;
   currentIndex = index;
   activeBoxIndex = -1;
+  issueTarget = null;
   loadIssueToForm();
+  renderIssuesList();
   updateGalleryHighlights();
   updatePosCounter();
   renderCurrent();
@@ -1952,6 +2083,11 @@ function toggleReviewMode() {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { closeCompareView(); exitReviewMode(); return; }
+  if ((e.key === 'Control' || e.key === 'Meta') && !e.repeat) {
+    e.preventDefault();
+    toggleMainViewMode();
+    return;
+  }
   const tag = document.activeElement ? document.activeElement.tagName : '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if (e.key === 'ArrowRight') { e.preventDefault(); nextItem(); }
@@ -1972,18 +2108,42 @@ async function renderCurrent() {
   magnifierImg = record.imageFile ? await loadImage(record.imageFile) : null;
   renderMeta(record);
   boxList.innerHTML = record.boxes.length ? '' : '<div class="hint">NO BOX</div>';
-  const firstByClass = new Set();
+  const groups = new Map();
   record.boxes.forEach((box, idx) => {
+    if (!groups.has(box.className)) groups.set(box.className, []);
+    groups.get(box.className).push({ box, idx });
+  });
+  groups.forEach((items, className) => {
     const row = document.createElement('div');
     row.className = 'box-row';
-    row.title = `${idx + 1}. ${box.className}`;
-    const showClass = !firstByClass.has(box.className);
-    firstByClass.add(box.className);
-    row.innerHTML = `<span class="swatch" style="background:${classColors[box.className] || '#a8a4bd'}"></span><span>${idx + 1}${showClass ? `. <span class="box-class-once">${escapeHtml(box.className)}</span>` : ''}</span><button>SEL</button>`;
-    row.querySelector('button').addEventListener('click', () => {
-      activeBoxIndex = idx;
-      renderCurrent();
+    row.title = className;
+    row.innerHTML = `<span class="swatch" style="background:${classColors[className] || '#a8a4bd'}"></span><span class="box-class-once">${escapeHtml(className)}</span><div class="btn-row"></div>`;
+    const actions = row.querySelector('.btn-row');
+    items.forEach(({ idx }) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = String(idx + 1);
+      btn.title = `${idx + 1}. ${className}`;
+      btn.classList.toggle('active', idx === activeBoxIndex);
+      btn.addEventListener('click', () => {
+        activeBoxIndex = idx;
+        issueTarget = { type: 'box', boxIndex: idx, className };
+        loadIssueToForm();
+        renderCurrent();
+      });
+      actions.appendChild(btn);
     });
+    const err = document.createElement('button');
+    err.type = 'button';
+    err.textContent = 'ERR';
+    err.addEventListener('click', () => {
+      issueTarget = { type: 'class', className, boxIndices: items.map(item => item.idx) };
+      activeBoxIndex = items[0]?.idx ?? -1;
+      loadIssueToForm();
+      renderCurrent();
+      document.getElementById('issueChecks').scrollIntoView({ block: 'nearest' });
+    });
+    actions.appendChild(err);
     boxList.appendChild(row);
   });
 }
@@ -2194,12 +2354,19 @@ function buildIssueChecks() {
 }
 buildIssueChecks();
 
+function updateMissingClassVisibility() {
+  const hasMissing = Array.from(document.querySelectorAll('#issueChecks input:checked')).some(input => input.value === 'missing');
+  document.getElementById('missingClassField').classList.toggle('hidden', !hasMissing);
+}
+
 function loadIssueToForm() {
   const record = records[currentIndex];
-  const issue = record ? issueMap.get(record.id) : null;
-  document.querySelectorAll('#issueChecks input').forEach(input => input.checked = issue?.types?.includes(input.value) || false);
-  document.getElementById('missingClassSelect').value = issue?.missingClass || '';
-  document.getElementById('noteInput').value = issue?.note || '';
+  const issue = record ? getRecordIssue(record) : null;
+  const entry = issue?.issues?.find(item => item.targetKey === targetKey(issueTarget)) || null;
+  document.querySelectorAll('#issueChecks input').forEach(input => input.checked = entry?.types?.includes(input.value) || false);
+  document.getElementById('missingClassSelect').value = entry?.missingClass || '';
+  document.getElementById('noteInput').value = entry?.note || '';
+  updateMissingClassVisibility();
 }
 
 function updateCurrentIssue() {
@@ -2208,8 +2375,20 @@ function updateCurrentIssue() {
   const types = Array.from(document.querySelectorAll('#issueChecks input:checked')).map(i => i.value);
   const missingClass = document.getElementById('missingClassSelect').value;
   const note = document.getElementById('noteInput').value.trim();
-  if (!types.length && !missingClass && !note) issueMap.delete(record.id);
-  else issueMap.set(record.id, { id: record.id, file: record.baseName, types, missingClass, note, boxCount: record.boxes.length, status: record.status });
+  const target = issueTarget || (activeBoxIndex >= 0 ? { type: 'box', boxIndex: activeBoxIndex, className: record.boxes[activeBoxIndex]?.className } : { type: 'image' });
+  updateMissingClassVisibility();
+  if (!types.length && !note) {
+    removeIssue(record.id, targetKey(target));
+    return;
+  }
+  upsertIssue(record, {
+    target,
+    targetKey: targetKey(target),
+    targetLabel: targetLabel(target),
+    types,
+    missingClass: types.includes('missing') ? missingClass : '',
+    note
+  });
   renderStats();
   renderIssuesList();
   updateGalleryHighlights();
@@ -2218,9 +2397,8 @@ function updateCurrentIssue() {
 function markOk() {
   const record = records[currentIndex];
   if (!record) return;
-  issueMap.delete(record.id);
   reviewedSet.add(record.id);
-  saveReviewResult(record, 'approved');
+  saveReviewResult(record, actionFromIssue(getRecordIssue(record)) || 'approved', getRecordIssue(record));
   loadIssueToForm();
   renderStats();
   renderIssuesList();
@@ -2232,27 +2410,51 @@ function clearCurrentIssue() {
   if (!record) return;
   issueMap.delete(record.id);
   reviewedSet.delete(record.id);
+  issueTarget = null;
+  activeBoxIndex = -1;
   saveReviewResult(record, 'cleared');
   loadIssueToForm();
   renderStats();
   renderIssuesList();
   updateGalleryHighlights();
+  renderCurrent();
 }
 
 function renderIssuesList() {
   const list = document.getElementById('issuesList');
-  const rows = Array.from(issueMap.values());
+  const record = records[currentIndex];
+  const rows = record ? (getRecordIssue(record)?.issues || []) : [];
   if (!rows.length) {
     list.innerHTML = '<div class="hint">NO ISSUE</div>';
     return;
   }
   list.innerHTML = rows.map(issue => `
     <div class="issue-row">
-      <strong>${escapeHtml(issue.file)}</strong>
-      <span>${escapeHtml(issue.types.join(', ') || '-')} ${issue.missingClass ? ' / MISSING: ' + escapeHtml(issue.missingClass) : ''}</span>
-      ${issue.note ? `<span>${escapeHtml(issue.note)}</span>` : ''}
+      <div class="issue-row-main">
+        <strong>${escapeHtml(issue.targetLabel || 'IMAGE')}</strong>
+        <span>${escapeHtml((issue.types || []).join(', ') || '-')} ${issue.missingClass ? ' / MISSING: ' + escapeHtml(issue.missingClass) : ''}</span>
+        ${issue.note ? `<span>${escapeHtml(issue.note)}</span>` : ''}
+      </div>
+      <div class="issue-actions">
+        <button type="button" data-edit-issue="${escapeHtml(issue.targetKey)}" title="EDIT">✎</button>
+        <button type="button" data-delete-issue="${escapeHtml(issue.targetKey)}" title="DELETE">×</button>
+      </div>
     </div>
   `).join('');
+  list.querySelectorAll('[data-delete-issue]').forEach(btn => {
+    btn.addEventListener('click', () => removeIssue(record.id, btn.dataset.deleteIssue));
+  });
+  list.querySelectorAll('[data-edit-issue]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const entry = rows.find(item => item.targetKey === btn.dataset.editIssue);
+      if (!entry) return;
+      issueTarget = entry.target || { type: 'image' };
+      activeBoxIndex = issueTarget.type === 'box' ? issueTarget.boxIndex : -1;
+      loadIssueToForm();
+      renderCurrent();
+      document.getElementById('noteInput').focus();
+    });
+  });
 }
 renderIssuesList();
 
@@ -2428,13 +2630,13 @@ function exportCsv() {
   const mainHeader = ['order', 'file', 'box_count', 'reviewed', 'issue_types', 'missing_class', 'note'];
   const mainRows = [mainHeader];
   reviewableRecords().forEach(record => {
-    const issue = issueMap.get(record.id) || {};
+    const issue = summarizeIssue(issueMap.get(record.id));
     mainRows.push([
       record.order,
       record.baseName,
       record.boxes.length,
       isReviewed(record) ? 'yes' : 'no',
-      (issue.types || []).join('|'),
+      issue.types,
       issue.missingClass || '',
       issue.note || ''
     ]);
@@ -2443,13 +2645,13 @@ function exportCsv() {
   const dupHeader = ['file', 'variants', 'reviewed', 'issue_types', 'missing_class', 'note'];
   const dupRows = [dupHeader];
   records.filter(r => r.status === 'matched' && isDuplicate(r)).forEach(record => {
-    const issue = issueMap.get(record.id) || {};
+    const issue = summarizeIssue(issueMap.get(record.id));
     const variants = (record.labelVariants || []).map(v => `${v.source}:${v.boxCount}\ubc15\uc2a4`).join(' | ');
     dupRows.push([
       record.baseName,
       variants,
       isReviewed(record) ? 'yes' : 'no',
-      (issue.types || []).join('|'),
+      issue.types,
       issue.missingClass || '',
       issue.note || ''
     ]);
@@ -2463,6 +2665,7 @@ function exportCsv() {
 
 function exportJson() {
   const reviewable = reviewableRecords();
+  const issueCount = Array.from(issueMap.values()).reduce((sum, issue) => sum + (issue.issues?.length || (issue.types?.length ? 1 : 0)), 0);
   const payload = {
     exportedAt: new Date().toISOString(),
     summary: {
@@ -2473,7 +2676,7 @@ function exportJson() {
       zeroBox: records.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length,
       duplicateFilenames: records.filter(r => r.status === 'matched' && isDuplicate(r)).length,
       boxes: records.reduce((sum, r) => sum + r.boxes.length, 0),
-      issues: issueMap.size,
+      issues: issueCount,
       reviewed: reviewable.filter(isReviewed).length
     },
     records: reviewable.map(r => ({
@@ -2549,6 +2752,8 @@ function resetAll() {
   objNamesClasses = [];
   records = [];
   currentIndex = -1;
+  activeBoxIndex = -1;
+  issueTarget = null;
   issueMap.clear();
   reviewedSet.clear();
   imageInput.value = '';
@@ -2581,6 +2786,7 @@ function escapeHtml(value) {
 readClassInput();
 renderClassControls();
 renderMissingClassOptions();
+updateMissingClassVisibility();
 updateClassSummary();
 </script>
 </body>
