@@ -91,7 +91,9 @@ emailForm.addEventListener("submit", async (event) => {
     return;
   }
   try {
-    await logEmail(emailInput.value.trim());
+    const email = emailInput.value.trim();
+    sessionStorage.setItem("fromliloUserEmail", email);
+    await logEmail(email);
   } catch (error) {
     console.warn(error);
   }

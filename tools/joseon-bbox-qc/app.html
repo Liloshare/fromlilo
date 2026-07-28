@@ -843,11 +843,64 @@ let thumbBitmapCache = new Map(); // File -> Promise<ImageBitmap|HTMLImageElemen
 let galleryThumbMap = new Map(); // record.id -> { card, canvas }
 let galleryObserver = null;
 let searchDebounceTimer = null;
+const userEmail = sessionStorage.getItem('fromliloUserEmail') || localStorage.getItem('fromliloUserEmail') || '';
 
 const imageInput = document.getElementById('imageInput');
 const labelInput = document.getElementById('labelInput');
 const imageDrop = document.getElementById('imageDrop');
 const labelDrop = document.getElementById('labelDrop');
+
+function localFileKey(file) {
+  if (!file) return '';
+  return `${file.name}__${file.size}__${file.lastModified}`;
+}
+
+function recordSource(record) {
+  if (record.r2Key) {
+    return {
+      sourceType: 'r2',
+      imageKey: record.r2Key,
+      imageFilename: record.imageFile?.name || record.baseName
+    };
+  }
+  return {
+    sourceType: 'local',
+    imageKey: localFileKey(record.imageFile) || record.id,
+    imageFilename: record.imageFile?.name || record.baseName
+  };
+}
+
+function actionFromIssue(issue) {
+  if (!issue) return 'approved';
+  return issue.types?.length ? issue.types.join('|') : issue.missingClass ? 'missing' : issue.note ? 'note' : 'issue';
+}
+
+async function saveReviewResult(record, action, issue = null) {
+  if (!record || !userEmail) return;
+  const source = recordSource(record);
+  const payload = {
+    userEmail,
+    ...source,
+    annotationFilename: record.labelFile?.name || '',
+    action,
+    note: issue?.note || '',
+    issueTypes: issue?.types || [],
+    missingClass: issue?.missingClass || '',
+    boxCount: record.boxes?.length || 0,
+    status: record.status || ''
+  };
+
+  try {
+    const response = await fetch('/api/review-result', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error('review_result_save_failed');
+  } catch (error) {
+    console.warn(error);
+  }
+}
 const runBtn = document.getElementById('runBtn');
 
 imageDrop.addEventListener('click', () => imageInput.click());
@@ -1095,6 +1148,7 @@ function updateCompareIssue() {
   const note = document.getElementById('compareNoteInput').value.trim();
   if (!types.length && !missingClass && !note) issueMap.delete(record.id);
   else issueMap.set(record.id, { id: record.id, file: record.baseName, types, missingClass, note, boxCount: record.boxes.length, status: record.status });
+  saveReviewResult(record, actionFromIssue(issueMap.get(record.id)), issueMap.get(record.id) || null);
   renderStats();
   renderIssuesList();
   updateGalleryHighlights();
@@ -1105,6 +1159,7 @@ function markCompareOk() {
   if (!record) return;
   issueMap.delete(record.id);
   reviewedSet.add(record.id);
+  saveReviewResult(record, 'approved');
   loadCompareIssueForm(record);
   renderStats();
   renderIssuesList();
@@ -1116,6 +1171,7 @@ function clearCompareIssue() {
   if (!record) return;
   issueMap.delete(record.id);
   reviewedSet.delete(record.id);
+  saveReviewResult(record, 'cleared');
   loadCompareIssueForm(record);
   renderStats();
   renderIssuesList();
@@ -1767,6 +1823,7 @@ function markOk() {
   if (!record) return;
   issueMap.delete(record.id);
   reviewedSet.add(record.id);
+  saveReviewResult(record, 'approved');
   loadIssueToForm();
   renderStats();
   renderIssuesList();
@@ -1778,6 +1835,7 @@ function clearCurrentIssue() {
   if (!record) return;
   issueMap.delete(record.id);
   reviewedSet.delete(record.id);
+  saveReviewResult(record, 'cleared');
   loadIssueToForm();
   renderStats();
   renderIssuesList();
