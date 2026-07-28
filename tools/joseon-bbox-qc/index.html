@@ -13,7 +13,7 @@
           <p class="eyebrow">fromlilo tools</p>
           <h1>업무 자동화 툴</h1>
         </div>
-        <div class="status" id="authStatus">로그인 필요</div>
+        <div class="status" id="authStatus">이메일 확인 필요</div>
       </header>
 
       <section class="tool-grid" aria-label="업무 자동화 툴 목록">
@@ -38,7 +38,7 @@
         <div>
           <p class="eyebrow">Shipbuilding QC</p>
           <h2>조선 검수 툴</h2>
-          <p id="workspaceText">소개 화면을 확인한 뒤 로그인하면 툴이 활성화됩니다.</p>
+          <p id="workspaceText">툴을 선택하고 소개 화면을 확인한 뒤 이메일을 입력하면 검수 화면으로 이동합니다.</p>
         </div>
         <div class="workspace-actions">
           <button class="primary" id="startToolButton" type="button" disabled>검수 시작</button>
@@ -70,18 +70,15 @@
       </section>
     </div>
 
-    <div class="modal-backdrop hidden" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
-      <form class="modal login-modal" id="loginForm">
-        <h2 id="loginTitle">로그인</h2>
+    <div class="modal-backdrop hidden" id="emailModal" role="dialog" aria-modal="true" aria-labelledby="emailTitle">
+      <form class="modal login-modal" id="emailForm">
+        <h2 id="emailTitle">이메일 확인</h2>
         <label>
           이메일
           <input type="email" name="email" placeholder="name@company.com" required />
         </label>
-        <label>
-          비밀번호
-          <input type="password" name="password" placeholder="••••••••" required />
-        </label>
-        <button class="primary" type="submit">로그인</button>
+        <p class="form-note" id="emailNote">유효한 이메일 주소를 입력하면 검수 화면으로 이동합니다.</p>
+        <button class="primary" type="submit">검수 화면 열기</button>
       </form>
     </div>
 
