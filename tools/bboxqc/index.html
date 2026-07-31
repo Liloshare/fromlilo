@@ -3156,7 +3156,7 @@ function issueTypeLabel(type) {
 
 function issueTargetText(issue) {
   const label = issue.targetLabel || 'IMAGE';
-  if (!issue.targetKey || issue.targetKey === 'image' || label === 'IMAGE') return '이미지 전체';
+  if (!issue.targetKey || issue.targetKey === 'image' || label === 'IMAGE') return 'all recheck';
   return label;
 }
 
