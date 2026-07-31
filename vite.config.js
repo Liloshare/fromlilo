@@ -10,7 +10,8 @@ export default defineConfig({
         labelingQa: resolve(__dirname, "labeling-qa.html"),
         shop: resolve(__dirname, "shop.html"),
         tools: resolve(__dirname, "tools/index.html"),
-        toolsApp: resolve(__dirname, "tools/app.html"),
+        bboxQc: resolve(__dirname, "tools/bboxqc/index.html"),
+        legacyToolsApp: resolve(__dirname, "tools/app.html"),
         legacyBboxQc: resolve(__dirname, "tools/bbox-qc/index.html"),
         legacyBboxQcApp: resolve(__dirname, "tools/bbox-qc/app.html")
       }
