@@ -200,7 +200,7 @@
 
     .toolbar {
       display: grid;
-      grid-template-columns: 200px auto;
+      grid-template-columns: minmax(320px, 560px);
       gap: 8px;
       padding: 10px;
       border-bottom: 1px solid var(--line);
@@ -261,11 +261,8 @@
     }
     .pager-actions { display: flex; gap: 6px; align-items: center; }
     .pager-actions button { min-height: 28px; padding: 4px 9px; }
-    .page-jump {
-      width: 88px;
-      min-height: 28px;
-      padding: 4px 8px;
-    }
+    .page-number.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .page-ellipsis { padding: 4px 2px; color: var(--muted); }
 
     .grid {
       display: grid;
@@ -1027,7 +1024,7 @@
 
     .class-edit-row {
       display: grid;
-      grid-template-columns: 48px 30px 1fr;
+      grid-template-columns: 48px 30px 1fr 88px;
       gap: 10px;
       align-items: center;
     }
@@ -1112,11 +1109,11 @@
         </div>
 
         <div class="stats">
-          <button class="stat filterable" type="button" data-gallery-filter="all"><div class="num" id="statImages">0</div><div class="label">IMG</div></button>
-          <button class="stat filterable" type="button" data-gallery-filter="matched"><div class="num ok" id="statMatched">0</div><div class="label">MATCH</div></button>
-          <button class="stat filterable" type="button" data-gallery-filter="zero"><div class="num warn" id="statZero">0</div><div class="label">ZERO</div></button>
-          <button class="stat filterable" type="button" data-gallery-filter="duplicate"><div class="num warn" id="statDuplicate">0</div><div class="label">DUP</div></button>
-          <button class="stat filterable" type="button" data-gallery-filter="box"><div class="num" id="statBoxes">0</div><div class="label">BOX</div></button>
+          <div class="stat"><div class="num" id="statImages">0</div><div class="label">IMG</div></div>
+          <div class="stat"><div class="num ok" id="statMatched">0</div><div class="label">MATCH</div></div>
+          <div class="stat"><div class="num warn" id="statZero">0</div><div class="label">ZERO</div></div>
+          <div class="stat"><div class="num warn" id="statDuplicate">0</div><div class="label">DUP</div></div>
+          <div class="stat"><div class="num" id="statBoxes">0</div><div class="label">BOX</div></div>
           <div class="stat-separator"></div>
           <button class="stat filterable" type="button" data-gallery-filter="issue"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></button>
           <button class="stat filterable" type="button" data-gallery-filter="done"><div class="num ok" id="statReviewed">0</div><div class="label">DONE</div></button>
@@ -1137,9 +1134,9 @@
       <div class="pager gallery-pager">
         <span id="pageInfo">0 / 0</span>
         <div class="pager-actions">
-          <button type="button" onclick="prevGalleryPage()">PREV</button>
-          <select class="page-jump" id="pageJumpTop" onchange="goGalleryPage(this.value)"></select>
-          <button type="button" onclick="nextGalleryPage()">NEXT</button>
+          <button class="pager-prev" type="button" onclick="prevGalleryPage()">PREV</button>
+          <span id="pageButtonsTop" class="pager-actions"></span>
+          <button class="pager-next" type="button" onclick="nextGalleryPage()">NEXT</button>
         </div>
       </div>
       <div class="gallery-wrap">
@@ -1148,9 +1145,9 @@
       <div class="pager gallery-pager">
         <span id="pageInfoBottom">0 / 0</span>
         <div class="pager-actions">
-          <button type="button" onclick="prevGalleryPage()">PREV</button>
-          <select class="page-jump" id="pageJumpBottom" onchange="goGalleryPage(this.value)"></select>
-          <button type="button" onclick="nextGalleryPage()">NEXT</button>
+          <button class="pager-prev" type="button" onclick="prevGalleryPage()">PREV</button>
+          <span id="pageButtonsBottom" class="pager-actions"></span>
+          <button class="pager-next" type="button" onclick="nextGalleryPage()">NEXT</button>
         </div>
       </div>
     </section>
@@ -1328,6 +1325,7 @@ let imageMap = new Map();
 let labelMap = new Map();
 let classes = [];
 let classColors = {};
+let classLineWidths = {};
 let visibleClasses = new Set();
 let classFilter = '__all__'; // '__all__' or a single class name — which images the gallery shows
 let reviewableTotal = 0; // count of matched+has-boxes records, for the stable #order badge
@@ -1545,12 +1543,14 @@ function openClassEditor() {
   list.innerHTML = '';
   classes.forEach((name, idx) => {
     const color = classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+    const lineWidth = classLineWidths[name] || 2;
     const row = document.createElement('div');
     row.className = 'class-edit-row';
     row.innerHTML = `
       <code>${idx}</code>
       <input type="color" value="${color}" data-class-color="${idx}" title="COLOR">
       <input type="text" value="${escapeHtml(name)}" data-class-name="${idx}">
+      <input type="number" min="1" max="5" step="1" value="${lineWidth}" data-class-width="${idx}" title="BOX PX">
     `;
     list.appendChild(row);
   });
@@ -1565,16 +1565,21 @@ function applyClassEditor() {
   const previous = [...classes];
   const nameInputs = Array.from(document.querySelectorAll('#classEditList input[data-class-name]'));
   const colorInputs = Array.from(document.querySelectorAll('#classEditList input[data-class-color]'));
+  const widthInputs = Array.from(document.querySelectorAll('#classEditList input[data-class-width]'));
   const next = nameInputs
     .map(input => input.value.trim())
     .filter(Boolean);
   if (!next.length) return;
 
   const nextColors = {};
+  const nextWidths = {};
   next.forEach((name, idx) => {
     nextColors[name] = colorInputs[idx]?.value || classColors[previous[idx]] || classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+    const width = Number(widthInputs[idx]?.value || classLineWidths[previous[idx]] || classLineWidths[name] || 2);
+    nextWidths[name] = Math.max(1, Math.min(5, Number.isFinite(width) ? Math.round(width) : 2));
   });
   classColors = nextColors;
+  classLineWidths = nextWidths;
   document.getElementById('classInput').value = next.join('\n');
 
   records.forEach(record => {
@@ -1666,6 +1671,7 @@ function readClassInput() {
   classes = document.getElementById('classInput').value.split(/\r?\n|,/).map(s => s.trim()).filter(Boolean);
   classes.forEach((name, idx) => {
     if (!classColors[name]) classColors[name] = DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+    if (!classLineWidths[name]) classLineWidths[name] = 2;
   });
   visibleClasses = classFilter === '__all__' ? new Set(classes) : new Set([classFilter]);
   updateClassSummary();
@@ -1987,16 +1993,26 @@ function renderClassControls() {
   records.forEach(r => r.boxes.forEach(b => all.includes(b.className) || all.push(b.className)));
   all.forEach((name, idx) => {
     if (!classColors[name]) classColors[name] = DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
+    if (!classLineWidths[name]) classLineWidths[name] = 2;
   });
   if (classFilter !== '__all__' && !all.includes(classFilter)) classFilter = '__all__';
 
   const row = document.getElementById('classChipRow');
   row.innerHTML = '';
-  row.appendChild(buildClassChip('__all__', 'ALL'));
-  all.forEach(name => row.appendChild(buildClassChip(name, name, classColors[name])));
+  const counts = classBoxCounts();
+  row.appendChild(buildClassChip('__all__', `ALL ${records.reduce((sum, r) => sum + r.boxes.length, 0)}`));
+  all.forEach(name => row.appendChild(buildClassChip(name, `${name} ${counts.get(name) || 0}`, classColors[name])));
   renderConsistencyClassOptions(all);
 
   renderMissingClassOptions();
+}
+
+function classBoxCounts() {
+  const counts = new Map();
+  records.forEach(record => {
+    record.boxes.forEach(box => counts.set(box.className, (counts.get(box.className) || 0) + 1));
+  });
+  return counts;
 }
 
 function renderConsistencyClassOptions(allClasses = classes) {
@@ -2220,22 +2236,37 @@ function updateGalleryPager(total, visible, totalPages) {
   const label = `${start}-${end} / ${total}`;
   info.textContent = label;
   bottomInfo.textContent = label;
-  ['pageJumpTop', 'pageJumpBottom'].forEach(id => {
-    const select = document.getElementById(id);
-    select.innerHTML = '';
-    for (let i = 0; i < totalPages; i++) {
-      const opt = document.createElement('option');
-      opt.value = String(i);
-      opt.textContent = `${i + 1} / ${totalPages}`;
-      select.appendChild(opt);
+  renderPageButtons('pageButtonsTop', totalPages);
+  renderPageButtons('pageButtonsBottom', totalPages);
+  document.querySelectorAll('.pager-prev').forEach(btn => btn.disabled = galleryPage <= 0);
+  document.querySelectorAll('.pager-next').forEach(btn => btn.disabled = galleryPage >= totalPages - 1);
+}
+
+function pageButtonIndexes(totalPages) {
+  if (totalPages <= 9) return Array.from({ length: totalPages }, (_, i) => i);
+  const set = new Set([0, totalPages - 1, galleryPage - 2, galleryPage - 1, galleryPage, galleryPage + 1, galleryPage + 2]);
+  return Array.from(set).filter(i => i >= 0 && i < totalPages).sort((a, b) => a - b);
+}
+
+function renderPageButtons(id, totalPages) {
+  const wrap = document.getElementById(id);
+  wrap.innerHTML = '';
+  let prev = -1;
+  pageButtonIndexes(totalPages).forEach(index => {
+    if (prev >= 0 && index - prev > 1) {
+      const ellipsis = document.createElement('span');
+      ellipsis.className = 'page-ellipsis';
+      ellipsis.textContent = '...';
+      wrap.appendChild(ellipsis);
     }
-    select.value = String(galleryPage);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `page-number ${index === galleryPage ? 'active' : ''}`;
+    btn.textContent = String(index + 1);
+    btn.addEventListener('click', () => goGalleryPage(index));
+    wrap.appendChild(btn);
+    prev = index;
   });
-  const buttons = document.querySelectorAll('.gallery-pager button');
-  buttons[0].disabled = galleryPage <= 0;
-  buttons[1].disabled = galleryPage >= totalPages - 1;
-  buttons[2].disabled = galleryPage <= 0;
-  buttons[3].disabled = galleryPage >= totalPages - 1;
 }
 
 function prevGalleryPage() {
@@ -2540,7 +2571,8 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     const isActive = canShowSelection && (idx === activeBoxIndex || selectedBoxIndices.has(idx));
     ctx.shadowColor = color;
     ctx.shadowBlur = isActive ? 16 : 10;
-    ctx.lineWidth = isActive ? 3 : 2;
+    const baseLineWidth = classLineWidths[box.className] || 2;
+    ctx.lineWidth = isActive ? Math.min(5, baseLineWidth + 1) : baseLineWidth;
     ctx.strokeStyle = isActive ? '#ffffff' : color;
     ctx.strokeRect(x, y, bw, bh);
     ctx.shadowBlur = 0;
@@ -2583,11 +2615,12 @@ function drawClassBoxes(ctx, record, className, canvasW, canvasH, imgW, imgH) {
     ctx.globalAlpha = 1;
     ctx.shadowColor = color;
     ctx.shadowBlur = 14;
-    ctx.lineWidth = 4;
+    const baseLineWidth = classLineWidths[box.className] || 2;
+    ctx.lineWidth = Math.min(5, baseLineWidth + 2);
     ctx.strokeStyle = '#ffffff';
     ctx.strokeRect(x, y, bw, bh);
     ctx.shadowBlur = 0;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = baseLineWidth;
     ctx.strokeStyle = color;
     ctx.strokeRect(x - 3, y - 3, bw + 6, bh + 6);
   });
@@ -2650,9 +2683,6 @@ function saveConsistencyIssue() {
   const record = records[currentIndex];
   if (!record) return;
   const note = document.getElementById('consisTitleInput').value.trim();
-  document.getElementById('noteInput').value = note;
-  const consisCheck = Array.from(document.querySelectorAll('#issueChecks input')).find(input => input.value === 'consis');
-  if (consisCheck) consisCheck.checked = true;
   const target = buildCurrentIssueTarget(record);
   upsertIssue(record, {
     target,
@@ -2666,6 +2696,7 @@ function saveConsistencyIssue() {
   renderStats();
   renderIssuesList();
   updateGalleryHighlights();
+  resetIssueDraft();
   closeConsistencyBoard();
 }
 
@@ -2823,7 +2854,8 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     const isActive = idx === activeBoxIndex || selectedBoxIndices.has(idx);
     ctx.shadowColor = color;
     ctx.shadowBlur = isActive ? 14 : 9;
-    ctx.lineWidth = isActive ? 3 : 2;
+    const baseLineWidth = classLineWidths[box.className] || 2;
+    ctx.lineWidth = isActive ? Math.min(5, baseLineWidth + 1) : baseLineWidth;
     ctx.strokeStyle = isActive ? '#ffffff' : color;
     ctx.strokeRect(x, y, w, h);
     ctx.shadowBlur = 0;
@@ -2841,11 +2873,8 @@ function renderMeta(record) {
   const rows = [
     ['NO', record.order ? `${record.order} / ${reviewableTotal}` : '-'],
     ['FILE', record.baseName],
-    ['STATUS', statusLabel(record)],
-    ['IMAGE', record.imageFile ? filePath(record.imageFile) : 'MISSING'],
     ['SIZE', record.imageSize ? `${record.imageSize.width} x ${record.imageSize.height}` : '-'],
-    ['BOX', String(record.boxes.length)],
-    ['PARSE', record.parseError || 'OK']
+    ['BOX', String(record.boxes.length)]
   ].map(([k, v]) => `<div class="meta-row"><div class="meta-key">${k}</div><div class="meta-val">${escapeHtml(v)}</div><button class="meta-copy" type="button" data-copy="${escapeHtml(v)}">COPY</button></div>`).join('');
 
   let dupRow = '';
@@ -3270,7 +3299,7 @@ function exportCsv() {
       record.baseName,
       record.boxes.length,
       isReviewed(record) ? 'yes' : 'no',
-      issue.types,
+      formatIssueTypes(issue.types ? issue.types.split('|') : []),
       issue.missingClass || '',
       issue.note || ''
     ]);
@@ -3285,14 +3314,33 @@ function exportCsv() {
       record.baseName,
       variants,
       isReviewed(record) ? 'yes' : 'no',
-      issue.types,
+      formatIssueTypes(issue.types ? issue.types.split('|') : []),
       issue.missingClass || '',
       issue.note || ''
     ]);
   });
 
+  const issueHeader = ['file', 'target', 'issue_types', 'missing_class', 'note', 'box_count', 'status'];
+  const issueRows = [issueHeader];
+  Array.from(issueMap.values())
+    .sort((a, b) => String(a.file || '').localeCompare(String(b.file || ''), 'ko', { numeric: true, sensitivity: 'base' }))
+    .forEach(group => {
+      (group.issues || []).forEach(issue => {
+        issueRows.push([
+          group.file || '',
+          issue.targetLabel || 'IMAGE',
+          formatIssueTypes(issue.types || []),
+          issue.missingClass || '',
+          issue.note || '',
+          group.boxCount ?? '',
+          group.status || ''
+        ]);
+      });
+    });
+
   downloadXlsx([
     { name: '\uac80\uc218\uacb0\uacfc', rows: mainRows },
+    { name: '\uc774\uc288\ub9ac\uc2a4\ud2b8', rows: issueRows },
     { name: '\uc911\ubcf5\ud30c\uc77c\uba85', rows: dupRows }
   ], 'bbox_qc_result.xlsx');
 }
@@ -3384,6 +3432,7 @@ function resetAll() {
   galleryPage = 0;
   lastGalleryRows = [];
   consistencyRows = [];
+  classLineWidths = {};
   imageFiles = [];
   labelFiles = [];
   objNamesClasses = [];
