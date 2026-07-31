@@ -261,7 +261,7 @@
     }
     .pager-actions { display: flex; gap: 6px; align-items: center; }
     .pager-actions button { min-height: 28px; padding: 4px 9px; }
-    .page-number.active { background: var(--accent); border-color: var(--accent); color: white; }
+    .page-number.active { background: var(--accent); border-color: var(--accent); color: #050505; }
     .page-ellipsis { padding: 4px 2px; color: var(--muted); }
 
     .grid {
@@ -1109,10 +1109,10 @@
         </div>
 
         <div class="stats">
-          <div class="stat"><div class="num" id="statImages">0</div><div class="label">IMG</div></div>
-          <div class="stat"><div class="num ok" id="statMatched">0</div><div class="label">MATCH</div></div>
-          <div class="stat"><div class="num warn" id="statZero">0</div><div class="label">ZERO</div></div>
-          <div class="stat"><div class="num warn" id="statDuplicate">0</div><div class="label">DUP</div></div>
+          <button class="stat filterable" type="button" data-gallery-filter="all"><div class="num" id="statImages">0</div><div class="label">IMG</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="matched"><div class="num ok" id="statMatched">0</div><div class="label">MATCH</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="zero"><div class="num warn" id="statZero">0</div><div class="label">ZERO</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="duplicate"><div class="num warn" id="statDuplicate">0</div><div class="label">DUP</div></button>
           <div class="stat"><div class="num" id="statBoxes">0</div><div class="label">BOX</div></div>
           <div class="stat-separator"></div>
           <button class="stat filterable" type="button" data-gallery-filter="issue"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></button>
