@@ -3150,6 +3150,44 @@ function formatIssueTypes(types) {
   return types.map(type => labels[type] || type).join(', ');
 }
 
+function issueTypeLabel(type) {
+  return (ISSUE_TYPES.find(([value]) => value === type) || [type, type])[1];
+}
+
+function issueTargetText(issue) {
+  const label = issue.targetLabel || 'IMAGE';
+  if (!issue.targetKey || issue.targetKey === 'image' || label === 'IMAGE') return '이미지 전체';
+  return label;
+}
+
+function issueMatrixCell(issues, type) {
+  const values = issues
+    .filter(issue => (issue.types || []).includes(type))
+    .map(issue => {
+      const parts = [issueTargetText(issue)];
+      if (issue.missingClass) parts.push(issue.missingClass);
+      if (issue.note) parts.push(issue.note);
+      return parts.join(' / ');
+    });
+  return Array.from(new Set(values)).join('\n');
+}
+
+function buildIssueMatrixRows() {
+  const issueTypes = ISSUE_TYPES.map(([value]) => value);
+  const rows = [['file', ...issueTypes.map(issueTypeLabel)]];
+  Array.from(issueMap.values())
+    .sort((a, b) => String(a.file || '').localeCompare(String(b.file || ''), 'ko', { numeric: true, sensitivity: 'base' }))
+    .forEach(group => {
+      const issues = group.issues || [];
+      if (!issues.length) return;
+      rows.push([
+        group.file || '',
+        ...issueTypes.map(type => issueMatrixCell(issues, type))
+      ]);
+    });
+  return rows;
+}
+
 // Only images that actually carry label data are worth a row in the QC
 // export \u2014 matching what the gallery shows. missing-image/missing-label/
 // zero-box counts are still surfaced as summary numbers (see exportJson)
@@ -3319,6 +3357,7 @@ function downloadXlsx(sheets, filename) {
 }
 
 function exportCsv() {
+  const issueMatrixRows = buildIssueMatrixRows();
   const mainHeader = ['order', 'file', 'box_count', 'reviewed', 'issue_types', 'missing_class', 'note'];
   const mainRows = [mainHeader];
   reviewableRecords().forEach(record => {
@@ -3368,8 +3407,9 @@ function exportCsv() {
     });
 
   downloadXlsx([
+    { name: '\uc774\uc288\uccb4\ud06c', rows: issueMatrixRows },
     { name: '\uac80\uc218\uacb0\uacfc', rows: mainRows },
-    { name: '\uc774\uc288\ub9ac\uc2a4\ud2b8', rows: issueRows },
+    { name: '\uc774\uc288\uc0c1\uc138', rows: issueRows },
     { name: '\uc911\ubcf5\ud30c\uc77c\uba85', rows: dupRows }
   ], 'bbox_qc_result.xlsx');
 }
