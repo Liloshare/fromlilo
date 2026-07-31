@@ -2904,7 +2904,7 @@ function renderMeta(record) {
     ['FILE', record.baseName],
     ['SIZE', record.imageSize ? `${record.imageSize.width} x ${record.imageSize.height}` : '-'],
     ['BOX', String(record.boxes.length)]
-  ].map(([k, v]) => `<div class="meta-row"><div class="meta-key">${k}</div><div class="meta-val">${escapeHtml(v)}</div><button class="meta-copy" type="button" data-copy="${escapeHtml(v)}">COPY</button></div>`).join('');
+  ].map(([k, v]) => `<div class="meta-row"><div class="meta-key">${k}</div><div class="meta-val">${escapeHtml(v)}</div>${k === 'FILE' ? `<button class="meta-copy" type="button" data-copy="${escapeHtml(v)}">COPY</button>` : '<span></span>'}</div>`).join('');
 
   let dupRow = '';
   if (isDuplicate(record)) {
@@ -2914,8 +2914,7 @@ function renderMeta(record) {
       const variantText = record.labelVariants.map(v => `${escapeHtml(v.source)}: ${v.boxCount} BOX`).join('<br>');
       parts.push(variantText);
     }
-    const copyText = parts.map(part => part.replace(/<br>/g, '\n').replace(/<[^>]*>/g, '')).join('\n');
-    dupRow = `<div class="meta-row"><div class="meta-key">DUP</div><div class="meta-val">${parts.join('<br>')}</div><button class="meta-copy" type="button" data-copy="${escapeHtml(copyText)}">COPY</button></div>`;
+    dupRow = `<div class="meta-row"><div class="meta-key">DUP</div><div class="meta-val">${parts.join('<br>')}</div><span></span></div>`;
   }
 
   document.getElementById('metaTable').innerHTML = rows + dupRow;
@@ -3358,59 +3357,8 @@ function downloadXlsx(sheets, filename) {
 
 function exportCsv() {
   const issueMatrixRows = buildIssueMatrixRows();
-  const mainHeader = ['order', 'file', 'box_count', 'reviewed', 'issue_types', 'missing_class', 'note'];
-  const mainRows = [mainHeader];
-  reviewableRecords().forEach(record => {
-    const issue = summarizeIssue(issueMap.get(record.id));
-    mainRows.push([
-      record.order,
-      record.baseName,
-      record.boxes.length,
-      isReviewed(record) ? 'yes' : 'no',
-      formatIssueTypes(issue.types ? issue.types.split('|') : []),
-      issue.missingClass || '',
-      issue.note || ''
-    ]);
-  });
-
-  const dupHeader = ['file', 'variants', 'reviewed', 'issue_types', 'missing_class', 'note'];
-  const dupRows = [dupHeader];
-  records.filter(r => r.status === 'matched' && isDuplicate(r)).forEach(record => {
-    const issue = summarizeIssue(issueMap.get(record.id));
-    const variants = (record.labelVariants || []).map(v => `${v.source}:${v.boxCount}\ubc15\uc2a4`).join(' | ');
-    dupRows.push([
-      record.baseName,
-      variants,
-      isReviewed(record) ? 'yes' : 'no',
-      formatIssueTypes(issue.types ? issue.types.split('|') : []),
-      issue.missingClass || '',
-      issue.note || ''
-    ]);
-  });
-
-  const issueHeader = ['file', 'target', 'issue_types', 'missing_class', 'note', 'box_count', 'status'];
-  const issueRows = [issueHeader];
-  Array.from(issueMap.values())
-    .sort((a, b) => String(a.file || '').localeCompare(String(b.file || ''), 'ko', { numeric: true, sensitivity: 'base' }))
-    .forEach(group => {
-      (group.issues || []).forEach(issue => {
-        issueRows.push([
-          group.file || '',
-          issue.targetLabel || 'IMAGE',
-          formatIssueTypes(issue.types || []),
-          issue.missingClass || '',
-          issue.note || '',
-          group.boxCount ?? '',
-          group.status || ''
-        ]);
-      });
-    });
-
   downloadXlsx([
-    { name: '\uc774\uc288\uccb4\ud06c', rows: issueMatrixRows },
-    { name: '\uac80\uc218\uacb0\uacfc', rows: mainRows },
-    { name: '\uc774\uc288\uc0c1\uc138', rows: issueRows },
-    { name: '\uc911\ubcf5\ud30c\uc77c\uba85', rows: dupRows }
+    { name: '\uc774\uc288\uccb4\ud06c', rows: issueMatrixRows }
   ], 'bbox_qc_result.xlsx');
 }
 
