@@ -168,6 +168,27 @@
       border-radius: 6px;
       padding: 10px;
       background: var(--soft);
+      text-align: left;
+      min-height: 58px;
+    }
+    .stat.filterable { cursor: pointer; }
+    .stat.filterable:hover,
+    .stat.active {
+      border-color: var(--accent);
+      background: #e1e6fa;
+      color: #5570c9;
+    }
+    .stat-separator {
+      grid-column: 1 / -1;
+      height: 1px;
+      background: var(--line);
+      margin: 2px 0;
+    }
+    .export-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
     }
     .stat .num { font-size: 20px; font-weight: 900; line-height: 1; }
     .stat .label { color: var(--muted); font-size: 11px; margin-top: 4px; font-weight: 700; }
@@ -240,6 +261,11 @@
     }
     .pager-actions { display: flex; gap: 6px; align-items: center; }
     .pager-actions button { min-height: 28px; padding: 4px 9px; }
+    .page-jump {
+      width: 88px;
+      min-height: 28px;
+      padding: 4px 8px;
+    }
 
     .grid {
       display: grid;
@@ -706,6 +732,21 @@
       display: grid;
       gap: 6px;
       padding: 8px;
+      position: relative;
+    }
+    .consis-remove {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 26px;
+      height: 26px;
+      min-height: 0;
+      padding: 0;
+      border-radius: 50%;
+      background: rgba(17,17,17,.82);
+      color: #fff;
+      border-color: rgba(255,255,255,.45);
+      z-index: 2;
     }
     .consis-card canvas {
       width: 100%;
@@ -1068,45 +1109,49 @@
 
         <div class="btn-row">
           <button class="primary" id="runBtn" onclick="runValidation()" disabled>RUN</button>
-          <button onclick="exportCsv()" id="csvBtn" disabled>XLSX</button>
-          <button onclick="exportJson()" id="jsonBtn" disabled>JSON</button>
         </div>
 
         <div class="stats">
-          <div class="stat"><div class="num" id="statImages">0</div><div class="label">IMG</div></div>
-          <div class="stat"><div class="num" id="statLabels">0</div><div class="label">LBL</div></div>
-          <div class="stat"><div class="num ok" id="statMatched">0</div><div class="label">MATCH</div></div>
-          <div class="stat"><div class="num warn" id="statZero">0</div><div class="label">ZERO</div></div>
-          <div class="stat"><div class="num warn" id="statDuplicate">0</div><div class="label">DUP</div></div>
-          <div class="stat"><div class="num" id="statBoxes">0</div><div class="label">BOX</div></div>
-          <div class="stat"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></div>
-          <div class="stat"><div class="num ok" id="statReviewed">0</div><div class="label">DONE</div></div>
+          <button class="stat filterable" type="button" data-gallery-filter="all"><div class="num" id="statImages">0</div><div class="label">IMG</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="matched"><div class="num ok" id="statMatched">0</div><div class="label">MATCH</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="zero"><div class="num warn" id="statZero">0</div><div class="label">ZERO</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="duplicate"><div class="num warn" id="statDuplicate">0</div><div class="label">DUP</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="box"><div class="num" id="statBoxes">0</div><div class="label">BOX</div></button>
+          <div class="stat-separator"></div>
+          <button class="stat filterable" type="button" data-gallery-filter="issue"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="done"><div class="num ok" id="statReviewed">0</div><div class="label">DONE</div></button>
           <div class="stat"><div class="num" id="statProgress">0%</div><div class="label">RATE</div></div>
+        </div>
+        <div class="export-actions">
+          <button onclick="exportCsv()" id="csvBtn" disabled>XLSX</button>
+          <button onclick="exportJson()" id="jsonBtn" disabled>JSON</button>
         </div>
       </div>
     </section>
 
     <section class="panel">
       <div class="toolbar">
-        <input id="searchInput" type="text" placeholder="SEARCH">
-        <select id="filterSelect" onchange="resetGalleryPageAndRender()">
-          <option value="all">ALL</option>
-          <option value="unreviewed">TODO</option>
-          <option value="issue">ISSUE</option>
-          <option value="duplicate">DUP</option>
-          <option value="zero">ZERO</option>
-        </select>
+        <input id="searchInput" type="text" placeholder="SEARCH FILE NAME">
       </div>
       <div class="class-chip-row" id="classChipRow"></div>
-      <div class="pager" id="galleryPager">
+      <div class="pager gallery-pager">
         <span id="pageInfo">0 / 0</span>
         <div class="pager-actions">
           <button type="button" onclick="prevGalleryPage()">PREV</button>
+          <select class="page-jump" id="pageJumpTop" onchange="goGalleryPage(this.value)"></select>
           <button type="button" onclick="nextGalleryPage()">NEXT</button>
         </div>
       </div>
       <div class="gallery-wrap">
         <div class="grid" id="gallery"></div>
+      </div>
+      <div class="pager gallery-pager">
+        <span id="pageInfoBottom">0 / 0</span>
+        <div class="pager-actions">
+          <button type="button" onclick="prevGalleryPage()">PREV</button>
+          <select class="page-jump" id="pageJumpBottom" onchange="goGalleryPage(this.value)"></select>
+          <button type="button" onclick="nextGalleryPage()">NEXT</button>
+        </div>
       </div>
     </section>
 
@@ -1226,6 +1271,7 @@
     <input id="consisTitleInput" type="text" placeholder="CONSIS TITLE" oninput="renderConsistencyBoard()">
     <select id="consisClassSelect" onchange="renderConsistencyBoard()"></select>
     <div class="btn-row">
+      <button type="button" onclick="saveConsistencyIssue()">SAVE</button>
       <button type="button" onclick="downloadConsistencyBoard()">DOWNLOAD</button>
       <button type="button" onclick="closeConsistencyBoard()">CLOSE</button>
     </div>
@@ -1310,6 +1356,7 @@ let searchDebounceTimer = null;
 let galleryPage = 0;
 let lastGalleryRows = [];
 let consistencyRows = [];
+let galleryFilter = 'all';
 const userEmail = sessionStorage.getItem('fromliloUserEmail') || localStorage.getItem('fromliloUserEmail') || '';
 let objNamesClasses = [];
 
@@ -1453,6 +1500,9 @@ document.getElementById('searchInput').addEventListener('input', () => {
     galleryPage = 0;
     renderGallery();
   }, 200);
+});
+document.querySelectorAll('[data-gallery-filter]').forEach(btn => {
+  btn.addEventListener('click', () => setGalleryFilter(btn.dataset.galleryFilter));
 });
 document.getElementById('classInput').addEventListener('input', () => {
   readClassInput();
@@ -1916,7 +1966,6 @@ function renderStats() {
   const reviewed = records.filter(r => r.status === 'matched' && (reviewedSet.has(r.id) || issueMap.has(r.id))).length;
   const issueCount = Array.from(issueMap.values()).reduce((sum, issue) => sum + (issue.issues?.length || (issue.types?.length ? 1 : 0)), 0);
   document.getElementById('statImages').textContent = imageFiles.length;
-  document.getElementById('statLabels').textContent = labelFiles.length;
   document.getElementById('statMatched').textContent = matched;
   document.getElementById('statZero').textContent = zero;
   document.getElementById('statDuplicate').textContent = duplicate;
@@ -1924,6 +1973,9 @@ function renderStats() {
   document.getElementById('statIssues').textContent = issueCount;
   document.getElementById('statReviewed').textContent = reviewed;
   document.getElementById('statProgress').textContent = matched ? `${Math.round(reviewed / matched * 100)}%` : '0%';
+  document.querySelectorAll('[data-gallery-filter]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.galleryFilter === galleryFilter);
+  });
 }
 
 function isReviewed(record) {
@@ -2001,26 +2053,47 @@ function setClassFilter(value) {
   renderCurrent();
 }
 
+function setGalleryFilter(value) {
+  galleryFilter = value || 'all';
+  galleryPage = 0;
+  renderStats();
+  renderGallery();
+}
+
 // The gallery is split into three mutually exclusive buckets so that files
 // with an unresolved filename collision (duplicate) or with no box data
 // (zero) never silently show up mixed into the normal "전체"/class-filtered
 // view — they only appear when their own filter tab is selected.
 function filteredRecords() {
   const q = document.getElementById('searchInput').value.trim().normalize('NFC').toLowerCase();
-  const f = document.getElementById('filterSelect').value;
+  const f = galleryFilter;
   return records.filter(r => {
-    if (r.status !== 'matched') return false;
+    if (f === 'all') {
+      if (!r.imageFile) return false;
+    } else if (r.status !== 'matched') return false;
     const dup = isDuplicate(r);
-    if (f === 'duplicate') {
+    if (f === 'all') {
+      // keep every uploaded image record in the main view
+    } else if (f === 'matched') {
+      // keep every matched image in the main view, including duplicate and zero-box records
+    } else if (f === 'duplicate') {
       if (!dup) return false;
     } else if (f === 'zero') {
       if (dup || r.boxes.length !== 0) return false;
+    } else if (f === 'box') {
+      if (dup || r.boxes.length === 0) return false;
     } else {
       if (dup || r.boxes.length === 0) return false;
       if (f === 'issue' && !issueMap.has(r.id)) return false;
       if (f === 'unreviewed' && isReviewed(r)) return false;
+      if (f === 'done' && !isReviewed(r)) return false;
     }
-    if (q && !r.baseName.normalize('NFC').toLowerCase().includes(q)) return false;
+    const imagePath = r.imageFile ? filePath(r.imageFile) : '';
+    const haystack = [r.baseName, r.imageFile?.name || '', r.labelFile?.name || '', imagePath.split(/[\\/]/).pop() || '']
+      .join(' ')
+      .normalize('NFC')
+      .toLowerCase();
+    if (q && !haystack.includes(q)) return false;
     if (classFilter !== '__all__' && !r.boxes.some(b => b.className === classFilter)) return false;
     return true;
   });
@@ -2056,7 +2129,8 @@ function duplicateVariantRows() {
   const rows = [];
   records.forEach(r => {
     if (r.status !== 'matched' || !isDuplicate(r)) return;
-    if (q && !r.baseName.normalize('NFC').toLowerCase().includes(q)) return;
+    const haystack = [r.baseName, r.imageFile?.name || '', r.labelFile?.name || ''].join(' ').normalize('NFC').toLowerCase();
+    if (q && !haystack.includes(q)) return;
     (r.labelVariants || []).forEach((variant, i) => {
       rows.push({
         id: `${r.id}__v${i}`,
@@ -2080,7 +2154,7 @@ function renderGallery() {
   galleryThumbMap.clear();
   if (galleryObserver) galleryObserver.disconnect();
 
-  const isDuplicateView = document.getElementById('filterSelect').value === 'duplicate';
+  const isDuplicateView = galleryFilter === 'duplicate';
   lastGalleryRows = isDuplicateView ? duplicateVariantRows() : filteredRecords();
   const totalPages = Math.max(1, Math.ceil(lastGalleryRows.length / PAGE_LIMIT));
   galleryPage = Math.max(0, Math.min(galleryPage, totalPages - 1));
@@ -2140,12 +2214,28 @@ function resetGalleryPageAndRender() {
 
 function updateGalleryPager(total, visible, totalPages) {
   const info = document.getElementById('pageInfo');
+  const bottomInfo = document.getElementById('pageInfoBottom');
   const start = total ? galleryPage * PAGE_LIMIT + 1 : 0;
   const end = total ? start + visible - 1 : 0;
-  info.textContent = `${start}-${end} / ${total}`;
-  const buttons = document.querySelectorAll('#galleryPager button');
+  const label = `${start}-${end} / ${total}`;
+  info.textContent = label;
+  bottomInfo.textContent = label;
+  ['pageJumpTop', 'pageJumpBottom'].forEach(id => {
+    const select = document.getElementById(id);
+    select.innerHTML = '';
+    for (let i = 0; i < totalPages; i++) {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = `${i + 1} / ${totalPages}`;
+      select.appendChild(opt);
+    }
+    select.value = String(galleryPage);
+  });
+  const buttons = document.querySelectorAll('.gallery-pager button');
   buttons[0].disabled = galleryPage <= 0;
   buttons[1].disabled = galleryPage >= totalPages - 1;
+  buttons[2].disabled = galleryPage <= 0;
+  buttons[3].disabled = galleryPage >= totalPages - 1;
 }
 
 function prevGalleryPage() {
@@ -2158,6 +2248,11 @@ function nextGalleryPage() {
   const totalPages = Math.max(1, Math.ceil(lastGalleryRows.length / PAGE_LIMIT));
   if (galleryPage >= totalPages - 1) return;
   galleryPage++;
+  renderGallery();
+}
+
+function goGalleryPage(value) {
+  galleryPage = Number(value) || 0;
   renderGallery();
 }
 
@@ -2538,11 +2633,40 @@ async function renderConsistencyBoard() {
   for (const record of consistencyRows) {
     const card = document.createElement('div');
     card.className = 'consis-card';
-    card.innerHTML = `<canvas></canvas><div class="consis-caption">${escapeHtml(record.imageFile?.name || record.baseName)}</div>`;
+    card.innerHTML = `<button class="consis-remove" type="button" title="REMOVE">×</button><canvas></canvas><div class="consis-caption">${escapeHtml(record.imageFile?.name || record.baseName)}</div>`;
     grid.appendChild(card);
+    card.querySelector('.consis-remove').addEventListener('click', () => removeConsistencyRow(record.id));
     const canvas = card.querySelector('canvas');
     await drawConsistencyCanvas(canvas, record, className, 360, 225);
   }
+}
+
+function removeConsistencyRow(recordId) {
+  consistencyRows = consistencyRows.filter(record => record.id !== recordId);
+  renderConsistencyBoard();
+}
+
+function saveConsistencyIssue() {
+  const record = records[currentIndex];
+  if (!record) return;
+  const note = document.getElementById('consisTitleInput').value.trim();
+  document.getElementById('noteInput').value = note;
+  const consisCheck = Array.from(document.querySelectorAll('#issueChecks input')).find(input => input.value === 'consis');
+  if (consisCheck) consisCheck.checked = true;
+  const target = buildCurrentIssueTarget(record);
+  upsertIssue(record, {
+    target,
+    targetKey: targetKey(target),
+    targetLabel: targetLabel(target),
+    types: ['consis'],
+    missingClass: '',
+    note
+  });
+  reviewedSet.add(record.id);
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
+  closeConsistencyBoard();
 }
 
 async function drawConsistencyCanvas(canvas, record, className, width, height) {
@@ -2718,7 +2842,6 @@ function renderMeta(record) {
     ['NO', record.order ? `${record.order} / ${reviewableTotal}` : '-'],
     ['FILE', record.baseName],
     ['STATUS', statusLabel(record)],
-    ['LABEL', record.labelFile ? filePath(record.labelFile) : 'MISSING'],
     ['IMAGE', record.imageFile ? filePath(record.imageFile) : 'MISSING'],
     ['SIZE', record.imageSize ? `${record.imageSize.width} x ${record.imageSize.height}` : '-'],
     ['BOX', String(record.boxes.length)],
@@ -2799,7 +2922,10 @@ function updateCurrentIssue() {
   if (!record) return;
   updateMissingClassVisibility();
   const types = Array.from(document.querySelectorAll('#issueChecks input:checked')).map(i => i.value);
-  if (types.includes('consis')) openConsistencyBoard();
+  if (types.includes('consis')) {
+    openConsistencyBoard();
+    return;
+  }
   const actionClasses = getSelectedActionClasses();
   const note = document.getElementById('noteInput').value.trim();
   const needsClass = types.some(type => type === 'missing' || type === 'unnecessary');
@@ -2878,6 +3004,10 @@ function markOk() {
   const hasDraftNote = document.getElementById('noteInput').value.trim();
   if (hasDraftType || hasDraftNote || getSelectedActionClasses().length) {
     const types = Array.from(document.querySelectorAll('#issueChecks input:checked')).map(i => i.value);
+    if (types.includes('consis')) {
+      openConsistencyBoard();
+      return;
+    }
     const needsClass = types.some(type => type === 'missing' || type === 'unnecessary');
     if (!needsClass || getSelectedActionClasses().length) {
       if (needsClass) applyActionClassIssue();
@@ -2921,7 +3051,7 @@ function renderIssuesList() {
     <div class="issue-row">
       <div class="issue-row-main">
         <strong>${escapeHtml(issue.targetLabel || 'IMAGE')}</strong>
-        <span>${escapeHtml((issue.types || []).join(', ') || '-')} ${issue.missingClass ? ' / MISSING: ' + escapeHtml(issue.missingClass) : ''}</span>
+        <span>${escapeHtml(formatIssueTypes(issue.types || [])) || '-'} ${issue.missingClass ? ' / MISSING: ' + escapeHtml(issue.missingClass) : ''}</span>
         ${issue.note ? `<span>${escapeHtml(issue.note)}</span>` : ''}
       </div>
       <div class="issue-actions">
@@ -2949,6 +3079,18 @@ function renderIssuesList() {
   });
 }
 renderIssuesList();
+
+function formatIssueTypes(types) {
+  const labels = {
+    wrong_class: 'WRONG CLASS',
+    wrong_box: 'SIZE',
+    consis: 'CONSIS',
+    missing: 'MISSING',
+    unnecessary: 'DELETE',
+    duplicate: 'DUPLICATE'
+  };
+  return types.map(type => labels[type] || type).join(', ');
+}
 
 // Only images that actually carry label data are worth a row in the QC
 // export \u2014 matching what the gallery shows. missing-image/missing-label/
