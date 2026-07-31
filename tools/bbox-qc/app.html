@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Joseon BBox QC</title>
+  <title>BBox QC</title>
   <style>
     :root {
       --bg: #f3f0fb;
@@ -927,7 +927,7 @@
 <body>
 <div class="app">
   <header>
-    <h1>Joseon BBox QC</h1>
+    <h1>BBox QC</h1>
     <div class="header-meta">
       <span id="statusText">IMAGE / LABEL</span>
     </div>
@@ -963,8 +963,8 @@
           <div class="class-preset-row">
             <select id="classPresetSelect">
               <option value="">PROJECT CLASS</option>
-              <option value="ship_task1">ship task1</option>
-              <option value="ship_task2">ship task2</option>
+              <option value="task1">task1</option>
+              <option value="task2">task2</option>
             </select>
             <button type="button" onclick="applyClassPreset()">LOAD</button>
           </div>
@@ -1128,7 +1128,7 @@
 const PAGE_LIMIT = 1000;
 const DEFAULT_COLORS = ['#f2867a','#6f9ce0','#5fb3a3','#f0b45c','#a685e8','#e87aa8','#6cbf7f','#5fb8cc','#ef9a5c','#8b85e8','#b3d967','#cc7070','#6ecfbe','#f5d76e','#9aa3b8'];
 const CLASS_PRESETS = {
-  ship_task1: [
+  task1: [
     'burnt',
     'hume',
     'point_burnt',
@@ -1145,7 +1145,7 @@ const CLASS_PRESETS = {
     'spatter',
     'weld'
   ],
-  ship_task2: [
+  task2: [
     'contamination',
     'drop',
     'damage',
@@ -2803,7 +2803,7 @@ function exportCsv() {
   downloadXlsx([
     { name: '\uac80\uc218\uacb0\uacfc', rows: mainRows },
     { name: '\uc911\ubcf5\ud30c\uc77c\uba85', rows: dupRows }
-  ], 'joseon_bbox_qc_result.xlsx');
+  ], 'bbox_qc_result.xlsx');
 }
 
 function exportJson() {
@@ -2840,7 +2840,7 @@ function exportJson() {
     missingImages: records.filter(r => r.status === 'missing-image').map(r => r.baseName),
     missingLabels: records.filter(r => r.status === 'missing-label').map(r => r.baseName)
   };
-  downloadBlob(JSON.stringify(payload, null, 2), 'joseon_bbox_qc_result.json', 'application/json;charset=utf-8');
+  downloadBlob(JSON.stringify(payload, null, 2), 'bbox_qc_result.json', 'application/json;charset=utf-8');
 }
 
 function downloadBlob(content, name, type) {

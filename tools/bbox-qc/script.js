@@ -14,7 +14,7 @@ const dots = Array.from(document.querySelectorAll(".dot"));
 const slides = [
   "이미지와 라벨 파일을 업로드하고, 클래스와 박스 오류를 한 화면에서 확인합니다.",
   "검수 기준에 맞지 않는 박스와 누락 가능성이 있는 데이터를 빠르게 찾습니다.",
-  "이메일 확인 후 프로젝트별 검수 작업을 시작할 수 있습니다."
+  "이메일 확인 후 검수 작업을 시작할 수 있습니다."
 ];
 
 let slideIndex = 0;
@@ -61,7 +61,7 @@ async function logEmail(email) {
     },
     body: JSON.stringify({
       email,
-      tool: "joseon-bbox-qc",
+      tool: "bbox-qc",
       page: window.location.pathname
     })
   });

@@ -2,4 +2,4 @@
 
 Pages for work automation tools.
 
-- `shipbuilding-qc/`: Shipbuilding QC tool
+- `bbox-qc/`: BBox QC tool
