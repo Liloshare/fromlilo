@@ -30,7 +30,11 @@ const files = collectFiles(dist);
 files["/"] = files["/index.html"];
 for (const [path, body] of Object.entries(files)) {
   if (path.endsWith("/index.html")) {
-    files[path.replace(/index\\.html$/, "")] = body;
+    const directoryPath = path.replace(/index\.html$/, "");
+    files[directoryPath] = body;
+    if (directoryPath.length > 1) {
+      files[directoryPath.replace(/\/$/, "")] = body;
+    }
   }
 }
 
