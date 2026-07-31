@@ -1016,6 +1016,15 @@
       border-bottom: 1px solid var(--line);
     }
 
+    .class-edit-tools {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      align-items: center;
+    }
+
     .class-edit-list {
       display: grid;
       gap: 8px;
@@ -1222,6 +1231,10 @@
         <button type="button" onclick="applyClassEditor()">APPLY</button>
         <button type="button" onclick="closeClassEditor()">CLOSE</button>
       </div>
+    </div>
+    <div class="class-edit-tools">
+      <input id="bulkClassWidthInput" type="number" min="1" max="5" step="1" value="2" aria-label="ALL BOX PX">
+      <button type="button" onclick="applyBulkClassWidth()">ALL PX</button>
     </div>
     <div class="class-edit-list" id="classEditList"></div>
   </div>
@@ -1541,6 +1554,7 @@ function openClassEditor() {
   readClassInput();
   const list = document.getElementById('classEditList');
   list.innerHTML = '';
+  document.getElementById('bulkClassWidthInput').value = defaultClassLineWidth();
   classes.forEach((name, idx) => {
     const color = classColors[name] || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
     const lineWidth = classLineWidths[name] || 2;
@@ -1555,6 +1569,21 @@ function openClassEditor() {
     list.appendChild(row);
   });
   document.getElementById('classEditModal').classList.remove('hidden');
+}
+
+function defaultClassLineWidth() {
+  const widths = classes.map(name => classLineWidths[name]).filter(Boolean);
+  if (!widths.length) return 2;
+  const first = widths[0];
+  return widths.every(width => width === first) ? first : 2;
+}
+
+function applyBulkClassWidth() {
+  const raw = Number(document.getElementById('bulkClassWidthInput').value || 2);
+  const width = Math.max(1, Math.min(5, Number.isFinite(raw) ? Math.round(raw) : 2));
+  document.querySelectorAll('#classEditList input[data-class-width]').forEach(input => {
+    input.value = String(width);
+  });
 }
 
 function closeClassEditor() {
