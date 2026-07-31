@@ -3173,7 +3173,7 @@ function issueMatrixCell(issues, type) {
 
 function buildIssueMatrixRows() {
   const issueTypes = ISSUE_TYPES.map(([value]) => value);
-  const rows = [['file', ...issueTypes.map(issueTypeLabel)]];
+  const rows = [['file', ...issueTypes.map(issueTypeLabel), 'NOTE']];
   Array.from(issueMap.values())
     .sort((a, b) => String(a.file || '').localeCompare(String(b.file || ''), 'ko', { numeric: true, sensitivity: 'base' }))
     .forEach(group => {
@@ -3181,7 +3181,8 @@ function buildIssueMatrixRows() {
       if (!issues.length) return;
       rows.push([
         group.file || '',
-        ...issueTypes.map(type => issueMatrixCell(issues, type))
+        ...issueTypes.map(type => issueMatrixCell(issues, type)),
+        Array.from(new Set(issues.map(issue => issue.note).filter(Boolean))).join('\n')
       ]);
     });
   return rows;
@@ -3230,6 +3231,14 @@ function buildSheetXml(rows) {
     return `<row r="${ri + 1}">${cells}</row>`;
   }).join('');
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`;
+}
+
+function encodeXml(xml) {
+  const bytes = new TextEncoder().encode(xml);
+  const out = new Uint8Array(bytes.length + 3);
+  out.set([0xEF, 0xBB, 0xBF], 0);
+  out.set(bytes, 3);
+  return out;
 }
 
 function buildWorkbookXml(sheetNames) {
@@ -3281,7 +3290,7 @@ function buildZip(files) {
     const lv = new DataView(localHeader.buffer);
     lv.setUint32(0, 0x04034b50, true);
     lv.setUint16(4, 20, true);
-    lv.setUint16(6, 0, true);
+    lv.setUint16(6, 0x0800, true);
     lv.setUint16(8, 0, true);
     lv.setUint16(10, 0, true);
     lv.setUint16(12, 0, true);
@@ -3298,7 +3307,7 @@ function buildZip(files) {
     cv.setUint32(0, 0x02014b50, true);
     cv.setUint16(4, 20, true);
     cv.setUint16(6, 20, true);
-    cv.setUint16(8, 0, true);
+    cv.setUint16(8, 0x0800, true);
     cv.setUint16(10, 0, true);
     cv.setUint16(12, 0, true);
     cv.setUint16(14, 0, true);
@@ -3337,14 +3346,13 @@ function buildZip(files) {
 
 // sheets: [{ name, rows: [[cell, ...], ...] }]
 function downloadXlsx(sheets, filename) {
-  const encoder = new TextEncoder();
   const sheetNames = sheets.map(s => s.name);
   const files = [
-    { name: '[Content_Types].xml', data: encoder.encode(buildContentTypesXml(sheetNames)) },
-    { name: '_rels/.rels', data: encoder.encode(XLSX_ROOT_RELS_XML) },
-    { name: 'xl/workbook.xml', data: encoder.encode(buildWorkbookXml(sheetNames)) },
-    { name: 'xl/_rels/workbook.xml.rels', data: encoder.encode(buildWorkbookRelsXml(sheetNames)) },
-    ...sheets.map((s, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: encoder.encode(buildSheetXml(s.rows)) }))
+    { name: '[Content_Types].xml', data: encodeXml(buildContentTypesXml(sheetNames)) },
+    { name: '_rels/.rels', data: encodeXml(XLSX_ROOT_RELS_XML) },
+    { name: 'xl/workbook.xml', data: encodeXml(buildWorkbookXml(sheetNames)) },
+    { name: 'xl/_rels/workbook.xml.rels', data: encodeXml(buildWorkbookRelsXml(sheetNames)) },
+    ...sheets.map((s, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: encodeXml(buildSheetXml(s.rows)) }))
   ];
   const blob = buildZip(files);
   const url = URL.createObjectURL(blob);
@@ -3358,7 +3366,7 @@ function downloadXlsx(sheets, filename) {
 function exportCsv() {
   const issueMatrixRows = buildIssueMatrixRows();
   downloadXlsx([
-    { name: '\uc774\uc288\uccb4\ud06c', rows: issueMatrixRows }
+    { name: 'issue_check', rows: issueMatrixRows }
   ], 'bbox_qc_result.xlsx');
 }
 
