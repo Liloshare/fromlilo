@@ -680,6 +680,362 @@
       background: var(--soft);
     }
 
+    .feedback-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 570;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+    }
+    .feedback-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .feedback-title {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+    .feedback-title .panel-title { overflow-wrap: anywhere; }
+    .feedback-count {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .feedback-body {
+      flex: 1 1 auto;
+      overflow: auto;
+      padding: 18px;
+      background: #dfe3ea;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 16px;
+      align-items: start;
+    }
+    .feedback-empty {
+      margin: 40px auto;
+      max-width: 460px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      text-align: center;
+    }
+    .feedback-deck {
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+    }
+    .feedback-slide {
+      width: min(1120px, 100%);
+      aspect-ratio: 16 / 9;
+      background: #fff;
+      border: 1px solid #cfd5df;
+      box-shadow: 0 8px 28px rgba(16,24,40,.16);
+      display: grid;
+      grid-template-columns: minmax(0, 1.48fr) minmax(280px, .82fr);
+      gap: 18px;
+      padding: 24px;
+      break-after: page;
+      page-break-after: always;
+    }
+    .feedback-tools {
+      display: none;
+    }
+    .feedback-sidebar {
+      position: sticky;
+      top: 0;
+      display: grid;
+      gap: 12px;
+      background: #fff;
+      border: 1px solid #cfd5df;
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 8px 24px rgba(16,24,40,.12);
+    }
+    .feedback-step {
+      display: grid;
+      gap: 8px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .feedback-step:last-child {
+      border-bottom: 0;
+      padding-bottom: 0;
+    }
+    .feedback-step-title {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: #111827;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .feedback-step-title span {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #111827;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 10px;
+    }
+    .feedback-tool-grid,
+    .feedback-color-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+    .feedback-tool-grid button,
+    .feedback-color-grid button {
+      min-height: 38px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 6px;
+    }
+    .feedback-tool-grid button.active,
+    .feedback-color-grid button.active {
+      background: #eef2ff;
+      border-color: #5570c9;
+      color: #111827;
+    }
+    .shape-icon {
+      width: 22px;
+      height: 22px;
+      display: block;
+    }
+    .color-dot {
+      width: 21px;
+      height: 21px;
+      border-radius: 50%;
+      display: block;
+      border: 2px solid rgba(255,255,255,.95);
+      box-shadow: 0 0 0 1px rgba(17,24,39,.16);
+    }
+    .feedback-action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+    .feedback-action-grid button {
+      min-height: 34px;
+      padding: 6px 8px;
+      font-size: 11px;
+    }
+    .feedback-save-status {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
+    .feedback-save-status.ready {
+      color: var(--ok);
+    }
+    .feedback-slide.editor {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr auto;
+      gap: 12px;
+    }
+    .feedback-slide-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+      color: #111827;
+    }
+    .feedback-slide-heading h2 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+    .feedback-grid {
+      min-height: 0;
+      display: grid;
+      gap: 12px;
+    }
+    .feedback-grid.count-1 { grid-template-columns: 1fr; }
+    .feedback-grid.count-2 { grid-template-columns: repeat(2, 1fr); }
+    .feedback-grid.count-3,
+    .feedback-grid.count-4 { grid-template-columns: repeat(2, 1fr); }
+    .feedback-item {
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid #cfd5df;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      background: #fafafa;
+    }
+    .feedback-item-meta {
+      padding: 7px 9px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: #111827;
+      font-size: 11px;
+      line-height: 1.2;
+      font-weight: 900;
+      overflow-wrap: anywhere;
+    }
+    .feedback-canvas-wrap {
+      min-height: 0;
+      background: #151823;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+    .feedback-canvas-wrap canvas {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      display: block;
+    }
+    .feedback-item-note {
+      border-top: 1px solid #e5e7eb;
+      padding: 7px 9px;
+      color: #374151;
+      font-size: 12px;
+      line-height: 1.3;
+      min-height: 32px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .feedback-comment {
+      width: 100%;
+      min-height: 74px;
+      resize: vertical;
+      border: 1px solid #cfd5df;
+      border-radius: 6px;
+      padding: 10px;
+      font: 14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .feedback-shot {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+    }
+    .feedback-file {
+      font-size: 14px;
+      line-height: 1.25;
+      font-weight: 900;
+      color: #111827;
+      overflow-wrap: anywhere;
+    }
+    .feedback-image-frame {
+      min-height: 0;
+      border: 1px solid #cfd5df;
+      background: #151823;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .feedback-image-frame canvas {
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      display: block;
+    }
+    .feedback-notes {
+      min-width: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+    }
+    .feedback-slide-no {
+      justify-self: start;
+      background: #111827;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 900;
+      padding: 5px 9px;
+      border-radius: 4px;
+    }
+    .feedback-card {
+      border: 1px solid #cfd5df;
+      border-radius: 6px;
+      padding: 14px;
+      display: grid;
+      align-content: start;
+      gap: 12px;
+      color: #111827;
+    }
+    .feedback-field {
+      display: grid;
+      gap: 5px;
+      font-size: 14px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .feedback-field b {
+      color: #6b7280;
+      font-size: 11px;
+      letter-spacing: 0;
+    }
+    .feedback-type {
+      color: #b4233f;
+      font-weight: 900;
+    }
+    .feedback-note-box {
+      min-height: 96px;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 10px;
+      white-space: pre-wrap;
+    }
+    @media (max-width: 900px) {
+      .feedback-head { align-items: start; }
+      .feedback-body { grid-template-columns: 1fr; }
+      .feedback-sidebar {
+        position: static;
+        order: -1;
+      }
+      .feedback-slide {
+        aspect-ratio: auto;
+        min-height: 620px;
+        grid-template-columns: 1fr;
+      }
+    }
+    @media print {
+      body.print-feedback > :not(#feedbackModal) { display: none !important; }
+      body.print-feedback #feedbackModal {
+        position: static;
+        inset: auto;
+        display: block !important;
+        background: #fff;
+      }
+      body.print-feedback .feedback-head { display: none; }
+      body.print-feedback .feedback-body {
+        padding: 0;
+        overflow: visible;
+        background: #fff;
+        display: block;
+      }
+      body.print-feedback .feedback-sidebar { display: none; }
+      body.print-feedback .feedback-deck { display: block; }
+      body.print-feedback .feedback-slide {
+        width: 100vw;
+        height: 100vh;
+        aspect-ratio: auto;
+        border: 0;
+        box-shadow: none;
+      }
+      body.print-feedback .feedback-comment {
+        border: 0;
+        resize: none;
+      }
+      @page { size: landscape; margin: 0; }
+    }
+
     .consis-modal {
       position: fixed;
       inset: 0;
@@ -1131,6 +1487,7 @@
         <div class="export-actions">
           <button onclick="exportCsv()" id="csvBtn" disabled>XLSX</button>
           <button onclick="exportJson()" id="jsonBtn" disabled>JSON</button>
+          <button onclick="openFeedbackDeck()" id="feedbackBtn" disabled>FEEDBACK</button>
         </div>
       </div>
     </section>
@@ -1273,6 +1630,61 @@
       </div>
       <div class="hint">DUP GROUP / XLSX TAB</div>
     </div>
+  </div>
+</div>
+
+<div class="feedback-modal hidden" id="feedbackModal">
+  <div class="feedback-head">
+    <div class="feedback-title">
+      <div class="panel-title">FEEDBACK</div>
+      <div class="feedback-count" id="feedbackCount">0 SLIDES</div>
+    </div>
+    <div class="btn-row">
+      <button type="button" onclick="printFeedbackDeck()">PDF</button>
+      <button type="button" onclick="closeFeedbackDeck()">CLOSE</button>
+    </div>
+  </div>
+  <div class="feedback-body">
+    <div class="feedback-deck" id="feedbackDeck"></div>
+    <aside class="feedback-sidebar">
+      <div class="feedback-step">
+        <div class="feedback-step-title"><span>1</span>EDIT</div>
+        <div class="feedback-save-status">피드백 페이지의 코멘트를 작성하고 이미지를 선택합니다.</div>
+      </div>
+      <div class="feedback-step">
+        <div class="feedback-step-title"><span>2</span>INSERT</div>
+        <div class="feedback-tool-grid" id="feedbackTools">
+          <button type="button" data-feedback-tool="select" title="SELECT" aria-label="SELECT">
+            <svg class="shape-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3l12 8-6 2-2 6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" data-feedback-tool="rect" title="BOX" aria-label="BOX">
+            <svg class="shape-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="6" width="14" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+          <button type="button" data-feedback-tool="circle" title="CIRCLE" aria-label="CIRCLE">
+            <svg class="shape-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+          <button type="button" data-feedback-tool="arrow" title="ARROW" aria-label="ARROW">
+            <svg class="shape-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18L18 6M11 6h7v7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="feedback-step">
+        <div class="feedback-step-title"><span>3</span>COLOR</div>
+        <div class="feedback-color-grid" id="feedbackColors"></div>
+      </div>
+      <div class="feedback-step">
+        <div class="feedback-step-title"><span>4</span>FIX</div>
+        <div class="feedback-action-grid">
+          <button type="button" onclick="deleteFeedbackShape()">DELETE</button>
+          <button type="button" onclick="clearFeedbackShapes()">CLEAR</button>
+        </div>
+      </div>
+      <div class="feedback-step">
+        <div class="feedback-step-title"><span>5</span>SAVE</div>
+        <button type="button" onclick="saveFeedbackDraft()">SAVE DRAFT</button>
+        <div class="feedback-save-status" id="feedbackSaveStatus">NOT SAVED</div>
+      </div>
+    </aside>
   </div>
 </div>
 
@@ -1816,6 +2228,7 @@ async function runValidation() {
     }
     document.getElementById('csvBtn').disabled = false;
     document.getElementById('jsonBtn').disabled = false;
+    document.getElementById('feedbackBtn').disabled = false;
     document.getElementById('statusText').textContent = 'READY';
     hideLoading();
   });
@@ -3407,6 +3820,360 @@ function exportJson() {
   downloadBlob(JSON.stringify(payload, null, 2), 'bbox_qc_result.json', 'application/json;charset=utf-8');
 }
 
+function feedbackRows() {
+  return Array.from(issueMap.values())
+    .flatMap(group => {
+      const record = records.find(item => item.id === group.id);
+      if (!record || !record.imageFile) return [];
+      return (group.issues || []).map(issue => ({ record, issue }));
+    })
+    .sort((a, b) => {
+      const ao = a.record.order || Number.MAX_SAFE_INTEGER;
+      const bo = b.record.order || Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      return String(a.record.baseName || '').localeCompare(String(b.record.baseName || ''), 'ko', { numeric: true, sensitivity: 'base' });
+    });
+}
+
+let feedbackSlides = [];
+let feedbackTool = 'rect';
+let feedbackColor = '#ff2d55';
+let feedbackActive = null;
+let feedbackDraft = null;
+const FEEDBACK_COLORS = ['#ff2d55', '#2563eb', '#16a34a', '#f59e0b', '#111827'];
+
+function buildFeedbackSlides(rows) {
+  const groups = new Map();
+  rows.forEach(row => {
+    const key = row.issue.types?.[0] || 'issue';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({
+      ...row,
+      shapes: [],
+      itemComment: row.issue.note || ''
+    });
+  });
+
+  const slides = [];
+  groups.forEach((items, key) => {
+    for (let i = 0; i < items.length; i += 4) {
+      slides.push({
+        id: `slide-${slides.length}`,
+        issueType: key,
+        title: issueTypeLabel(key),
+        items: items.slice(i, i + 4),
+        comment: ''
+      });
+    }
+  });
+  return slides;
+}
+
+function setFeedbackTool(tool) {
+  feedbackTool = tool;
+  document.querySelectorAll('#feedbackTools [data-feedback-tool]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.feedbackTool === tool);
+  });
+}
+
+function setFeedbackColor(color) {
+  feedbackColor = color;
+  document.querySelectorAll('#feedbackColors [data-feedback-color]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.feedbackColor === color);
+  });
+  const activeShape = getActiveFeedbackShape();
+  if (activeShape) {
+    activeShape.color = color;
+    redrawActiveFeedbackCanvas();
+  }
+}
+
+function buildFeedbackColorButtons() {
+  const wrap = document.getElementById('feedbackColors');
+  if (!wrap || wrap.dataset.ready) return;
+  wrap.dataset.ready = '1';
+  FEEDBACK_COLORS.forEach(color => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.feedbackColor = color;
+    btn.title = color;
+    btn.innerHTML = `<span class="color-dot" style="background:${color}"></span>`;
+    btn.addEventListener('click', () => setFeedbackColor(color));
+    wrap.appendChild(btn);
+  });
+}
+
+async function openFeedbackDeck() {
+  const rows = feedbackRows();
+  const modal = document.getElementById('feedbackModal');
+  const deck = document.getElementById('feedbackDeck');
+  feedbackSlides = buildFeedbackSlides(rows);
+  feedbackActive = null;
+  buildFeedbackColorButtons();
+  setFeedbackTool(feedbackTool);
+  setFeedbackColor(feedbackColor);
+  updateFeedbackSaveStatus('NOT SAVED');
+  document.getElementById('feedbackCount').textContent = `${feedbackSlides.length} PAGES / ${rows.length} ISSUES`;
+  deck.innerHTML = rows.length ? '' : '<div class="feedback-empty">NO ISSUE</div>';
+  modal.classList.remove('hidden');
+
+  for (const [index, slideData] of feedbackSlides.entries()) {
+    const slide = document.createElement('section');
+    slide.className = 'feedback-slide editor';
+    slide.dataset.slideIndex = String(index);
+    slide.innerHTML = `
+      <div class="feedback-slide-heading">
+        <h2>${escapeHtml(slideData.title)}</h2>
+        <div class="feedback-slide-no">${String(index + 1).padStart(2, '0')}</div>
+      </div>
+      <div class="feedback-grid count-${slideData.items.length}">
+        ${slideData.items.map((item, itemIndex) => `
+          <div class="feedback-item">
+            <div class="feedback-item-meta">
+              <span>${escapeHtml(item.record.baseName || item.record.imageFile.name)}</span>
+              <span>${escapeHtml(item.issue.targetLabel || 'IMAGE')}</span>
+            </div>
+            <div class="feedback-canvas-wrap"><canvas data-slide-index="${index}" data-item-index="${itemIndex}"></canvas></div>
+            <div class="feedback-item-note">${escapeHtml(formatIssueTypes(item.issue.types || []))}${item.issue.missingClass ? ' / ' + escapeHtml(item.issue.missingClass) : ''}${item.issue.note ? '<br>' + escapeHtml(item.issue.note) : ''}</div>
+          </div>
+        `).join('')}
+      </div>
+      <textarea class="feedback-comment" placeholder="COMMENT" data-slide-comment="${index}">${escapeHtml(slideData.comment)}</textarea>
+    `;
+    deck.appendChild(slide);
+    slide.querySelector('[data-slide-comment]').addEventListener('input', event => {
+      feedbackSlides[index].comment = event.target.value;
+      updateFeedbackSaveStatus('UNSAVED CHANGES');
+    });
+    for (const canvas of slide.querySelectorAll('canvas')) {
+      attachFeedbackCanvasEvents(canvas);
+      await redrawFeedbackCanvas(canvas);
+    }
+  }
+}
+
+function feedbackCanvasItem(canvas) {
+  const slideIndex = Number(canvas.dataset.slideIndex);
+  const itemIndex = Number(canvas.dataset.itemIndex);
+  return {
+    slideIndex,
+    itemIndex,
+    item: feedbackSlides[slideIndex]?.items[itemIndex]
+  };
+}
+
+async function redrawFeedbackCanvas(canvas) {
+  const { slideIndex, itemIndex, item } = feedbackCanvasItem(canvas);
+  if (!item) return;
+  await renderFeedbackCanvas(canvas, item.record, item.issue, item.shapes, feedbackActive?.slideIndex === slideIndex && feedbackActive?.itemIndex === itemIndex ? feedbackActive.shapeIndex : -1);
+}
+
+async function renderFeedbackCanvas(canvas, record, issue, shapes = [], activeShapeIndex = -1) {
+  const previousVisibleClasses = visibleClasses;
+  visibleClasses = new Set(classes);
+  record.boxes.forEach(box => visibleClasses.add(box.className));
+  await renderCanvas(canvas, record, 900, false);
+  visibleClasses = previousVisibleClasses;
+  const ctx = canvas.getContext('2d');
+  const img = await loadImage(record.imageFile);
+  drawFeedbackTarget(ctx, record, issue, canvas.width, canvas.height, img.naturalWidth, img.naturalHeight);
+  shapes.forEach((shape, index) => drawFeedbackShape(ctx, shape, canvas.width, canvas.height, index === activeShapeIndex));
+}
+
+function feedbackTargetBoxIndexesForRecord(record, issue) {
+  const target = issue?.target;
+  if (!target) return [];
+  if (target.type === 'box') return [target.boxIndex].filter(idx => Number.isInteger(idx));
+  if (target.type === 'boxes') return (target.boxIndices || []).filter(idx => Number.isInteger(idx));
+  if (target.type === 'class') {
+    return record.boxes
+      .map((box, idx) => box.className === target.className ? idx : -1)
+      .filter(idx => idx >= 0);
+  }
+  return [];
+}
+
+function drawFeedbackTarget(ctx, record, issue, canvasW, canvasH, imgW, imgH) {
+  const indexes = feedbackTargetBoxIndexesForRecord(record, issue);
+  if (!indexes.length) return;
+  const scaleX = canvasW / imgW;
+  const scaleY = canvasH / imgH;
+  ctx.save();
+  indexes.forEach(idx => {
+    const box = record.boxes[idx];
+    if (!box) return;
+    const x = (box.xc - box.bw / 2) * imgW * scaleX;
+    const y = (box.yc - box.bh / 2) * imgH * scaleY;
+    const w = box.bw * imgW * scaleX;
+    const h = box.bh * imgH * scaleY;
+    ctx.lineWidth = Math.max(4, Math.round(canvasW / 170));
+    ctx.strokeStyle = '#ff2d55';
+    ctx.shadowColor = 'rgba(255,45,85,.75)';
+    ctx.shadowBlur = 14;
+    ctx.strokeRect(x, y, w, h);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#ff2d55';
+    ctx.font = `${Math.max(14, Math.round(canvasW / 48))}px "Courier New", monospace`;
+    ctx.fillText(`ISSUE ${idx + 1}`, x + 6, Math.max(20, y - 8));
+  });
+  ctx.restore();
+}
+
+function drawFeedbackShape(ctx, shape, canvasW, canvasH, active = false) {
+  const x1 = shape.x1 * canvasW;
+  const y1 = shape.y1 * canvasH;
+  const x2 = shape.x2 * canvasW;
+  const y2 = shape.y2 * canvasH;
+  ctx.save();
+  ctx.strokeStyle = active ? '#111827' : (shape.color || feedbackColor);
+  ctx.fillStyle = active ? '#111827' : (shape.color || feedbackColor);
+  ctx.lineWidth = active ? 5 : 4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (shape.type === 'rect') {
+    ctx.strokeRect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+  } else if (shape.type === 'circle') {
+    ctx.beginPath();
+    ctx.ellipse((x1 + x2) / 2, (y1 + y2) / 2, Math.abs(x2 - x1) / 2, Math.abs(y2 - y1) / 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (shape.type === 'arrow') {
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const head = Math.max(14, canvasW / 45);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - head * Math.cos(angle - Math.PI / 6), y2 - head * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function canvasPoint(event, canvas) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+    y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
+  };
+}
+
+function attachFeedbackCanvasEvents(canvas) {
+  canvas.addEventListener('pointerdown', event => {
+    const { slideIndex, itemIndex, item } = feedbackCanvasItem(canvas);
+    if (!item) return;
+    const point = canvasPoint(event, canvas);
+    if (feedbackTool === 'select') {
+      feedbackActive = { slideIndex, itemIndex, shapeIndex: Math.max(0, item.shapes.length - 1) };
+      const activeShape = getActiveFeedbackShape();
+      if (activeShape?.color) setFeedbackColor(activeShape.color);
+      redrawFeedbackCanvas(canvas);
+      return;
+    }
+    feedbackDraft = { canvas, slideIndex, itemIndex, shape: { type: feedbackTool, color: feedbackColor, x1: point.x, y1: point.y, x2: point.x, y2: point.y } };
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!feedbackDraft || feedbackDraft.canvas !== canvas) return;
+    const point = canvasPoint(event, canvas);
+    feedbackDraft.shape.x2 = point.x;
+    feedbackDraft.shape.y2 = point.y;
+    redrawFeedbackCanvas(canvas).then(() => {
+      const ctx = canvas.getContext('2d');
+      drawFeedbackShape(ctx, feedbackDraft.shape, canvas.width, canvas.height, true);
+    });
+  });
+  canvas.addEventListener('pointerup', event => {
+    if (!feedbackDraft || feedbackDraft.canvas !== canvas) return;
+    const { slideIndex, itemIndex, shape } = feedbackDraft;
+    const item = feedbackSlides[slideIndex]?.items[itemIndex];
+    feedbackDraft = null;
+    if (!item) return;
+    const tooSmall = Math.abs(shape.x2 - shape.x1) < 0.01 && Math.abs(shape.y2 - shape.y1) < 0.01;
+    if (!tooSmall) {
+      item.shapes.push(shape);
+      feedbackActive = { slideIndex, itemIndex, shapeIndex: item.shapes.length - 1 };
+      updateFeedbackSaveStatus('UNSAVED CHANGES');
+    }
+    canvas.releasePointerCapture(event.pointerId);
+    redrawFeedbackCanvas(canvas);
+  });
+}
+
+function getActiveFeedbackShape() {
+  if (!feedbackActive) return null;
+  return feedbackSlides[feedbackActive.slideIndex]?.items[feedbackActive.itemIndex]?.shapes[feedbackActive.shapeIndex] || null;
+}
+
+function redrawActiveFeedbackCanvas() {
+  if (!feedbackActive) return;
+  const canvas = document.querySelector(`canvas[data-slide-index="${feedbackActive.slideIndex}"][data-item-index="${feedbackActive.itemIndex}"]`);
+  if (canvas) redrawFeedbackCanvas(canvas);
+}
+
+function deleteFeedbackShape() {
+  if (!feedbackActive) return;
+  const item = feedbackSlides[feedbackActive.slideIndex]?.items[feedbackActive.itemIndex];
+  if (!item) return;
+  item.shapes.splice(feedbackActive.shapeIndex, 1);
+  const canvas = document.querySelector(`canvas[data-slide-index="${feedbackActive.slideIndex}"][data-item-index="${feedbackActive.itemIndex}"]`);
+  feedbackActive = null;
+  updateFeedbackSaveStatus('UNSAVED CHANGES');
+  if (canvas) redrawFeedbackCanvas(canvas);
+}
+
+function clearFeedbackShapes() {
+  if (!feedbackActive) return;
+  const item = feedbackSlides[feedbackActive.slideIndex]?.items[feedbackActive.itemIndex];
+  if (!item) return;
+  item.shapes = [];
+  const canvas = document.querySelector(`canvas[data-slide-index="${feedbackActive.slideIndex}"][data-item-index="${feedbackActive.itemIndex}"]`);
+  feedbackActive = null;
+  updateFeedbackSaveStatus('UNSAVED CHANGES');
+  if (canvas) redrawFeedbackCanvas(canvas);
+}
+
+function saveFeedbackDraft() {
+  const payload = {
+    savedAt: new Date().toISOString(),
+    slides: feedbackSlides.map(slide => ({
+      title: slide.title,
+      issueType: slide.issueType,
+      comment: slide.comment,
+      items: slide.items.map(item => ({
+        file: item.record.baseName,
+        target: item.issue.targetLabel || 'IMAGE',
+        types: item.issue.types || [],
+        note: item.issue.note || '',
+        missingClass: item.issue.missingClass || '',
+        shapes: item.shapes
+      }))
+    }))
+  };
+  localStorage.setItem('bboxFeedbackDraft', JSON.stringify(payload));
+  updateFeedbackSaveStatus(`SAVED ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`);
+}
+
+function updateFeedbackSaveStatus(text) {
+  const status = document.getElementById('feedbackSaveStatus');
+  if (!status) return;
+  status.textContent = text;
+  status.classList.toggle('ready', text.startsWith('SAVED'));
+}
+
+function closeFeedbackDeck() {
+  document.getElementById('feedbackModal').classList.add('hidden');
+  document.body.classList.remove('print-feedback');
+}
+
+function printFeedbackDeck() {
+  document.body.classList.add('print-feedback');
+  window.print();
+}
+
 function downloadBlob(content, name, type) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -3480,6 +4247,7 @@ function resetAll() {
   runBtn.disabled = true;
   document.getElementById('csvBtn').disabled = true;
   document.getElementById('jsonBtn').disabled = true;
+  document.getElementById('feedbackBtn').disabled = true;
   document.getElementById('gallery').innerHTML = '';
   document.getElementById('boxList').innerHTML = '';
   document.getElementById('mainCanvas').width = 1;
