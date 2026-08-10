@@ -200,12 +200,27 @@
 
     .toolbar {
       display: grid;
-      grid-template-columns: minmax(320px, 560px);
+      grid-template-columns: minmax(220px, 1fr) auto auto;
       gap: 8px;
       padding: 10px;
       border-bottom: 1px solid var(--line);
       background: #f9f6fd;
       align-items: center;
+    }
+    .toolbar .file-filter-btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 88px;
+    }
+    .toolbar select { min-width: 118px; }
+    .toolbar-status {
+      grid-column: 1 / -1;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 800;
+      min-height: 14px;
     }
 
     .class-chip-row {
@@ -387,7 +402,7 @@
       max-width: 100%;
       height: auto;
       display: block;
-      cursor: zoom-in;
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 15 15'%3E%3Crect x='0.5' y='0.5' width='14' height='14' fill='none' stroke='%23000000' stroke-width='1'/%3E%3Crect x='1.5' y='1.5' width='12' height='12' fill='none' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E") 7 7, crosshair;
     }
     .nav-arrow {
       position: absolute;
@@ -1495,6 +1510,14 @@
     <section class="panel">
       <div class="toolbar">
         <input id="searchInput" type="text" placeholder="SEARCH FILE NAME">
+        <button class="file-filter-btn" id="excelFilterBtn" type="button">XLSX</button>
+        <input id="excelFilterInput" type="file" accept=".xlsx,.csv,text/csv">
+        <select id="sampleModeSelect" aria-label="SAMPLE MODE">
+          <option value="all">ALL</option>
+          <option value="5">RANDOM 5%</option>
+          <option value="10">RANDOM 10%</option>
+        </select>
+        <div class="toolbar-status" id="toolbarStatus"></div>
       </div>
       <div class="class-chip-row" id="classChipRow"></div>
       <div class="pager gallery-pager">
@@ -1780,6 +1803,9 @@ let galleryPage = 0;
 let lastGalleryRows = [];
 let consistencyRows = [];
 let galleryFilter = 'all';
+let excelFilterNames = new Set();
+let sampleMode = 'all';
+let sampleIds = new Set();
 const userEmail = sessionStorage.getItem('fromliloUserEmail') || localStorage.getItem('fromliloUserEmail') || '';
 let objNamesClasses = [];
 
@@ -1787,6 +1813,8 @@ const imageInput = document.getElementById('imageInput');
 const labelInput = document.getElementById('labelInput');
 const imageDrop = document.getElementById('imageDrop');
 const labelDrop = document.getElementById('labelDrop');
+const excelFilterInput = document.getElementById('excelFilterInput');
+const toolbarStatus = document.getElementById('toolbarStatus');
 
 function localFileKey(file) {
   if (!file) return '';
@@ -1917,6 +1945,18 @@ imageDrop.addEventListener('click', () => imageInput.click());
 labelDrop.addEventListener('click', () => labelInput.click());
 imageInput.addEventListener('change', e => handleImages(e.target.files));
 labelInput.addEventListener('change', e => handleLabels(e.target.files));
+document.getElementById('excelFilterBtn').addEventListener('click', () => excelFilterInput.click());
+excelFilterInput.addEventListener('change', e => handleExcelFilter(e.target.files?.[0]));
+document.getElementById('sampleModeSelect').addEventListener('change', e => {
+  sampleMode = e.target.value || 'all';
+  buildSampleIds();
+  galleryPage = 0;
+  reviewQueue = [];
+  reviewPos = -1;
+  renderStats();
+  renderGallery();
+  updateToolbarStatus();
+});
 document.getElementById('searchInput').addEventListener('input', () => {
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(() => {
@@ -1948,8 +1988,57 @@ function normalizedStem(name) {
   return name.replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, '').normalize('NFC').toLowerCase();
 }
 
+function normalizedFileToken(value) {
+  return String(value || '').replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, '').trim().normalize('NFC').toLowerCase();
+}
+
 function filePath(file) {
   return file.webkitRelativePath || file.name;
+}
+
+function recordMatchesExcelFilter(record) {
+  if (!excelFilterNames.size) return true;
+  return [record.baseName, record.imageFile?.name, record.labelFile?.name]
+    .filter(Boolean)
+    .some(name => excelFilterNames.has(normalizedFileToken(name)));
+}
+
+function recordMatchesSample(record) {
+  return sampleMode === 'all' || sampleIds.has(record.id);
+}
+
+function buildSampleIds() {
+  sampleIds = new Set();
+  if (sampleMode === 'all' || !records.length) return;
+  const percent = Number(sampleMode);
+  if (!Number.isFinite(percent) || percent <= 0) return;
+  const candidates = records.filter(record => record.imageFile);
+  const count = Math.max(1, Math.ceil(candidates.length * percent / 100));
+  stableShuffle(candidates).slice(0, count).forEach(record => sampleIds.add(record.id));
+}
+
+function stableShuffle(items) {
+  return items
+    .map(item => ({ item, rank: hashString(`${item.id}|${imageFiles.length}|${labelFiles.length}`) }))
+    .sort((a, b) => a.rank - b.rank)
+    .map(entry => entry.item);
+}
+
+function hashString(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function updateToolbarStatus(message = '') {
+  if (!toolbarStatus) return;
+  const parts = [];
+  if (excelFilterNames.size) parts.push(`XLSX ${excelFilterNames.size}`);
+  if (sampleMode !== 'all') parts.push(`SAMPLE ${sampleMode}% / ${sampleIds.size}`);
+  toolbarStatus.textContent = message || parts.join(' · ');
 }
 
 function updateClassSummary() {
@@ -2074,6 +2163,128 @@ async function handleLabels(files) {
   labelDrop.querySelector('strong').textContent = `LBL ${labelFiles.length}`;
   labelDrop.querySelector('span').textContent = objNames ? `OBJ.NAMES / ${classes.length} CLASS` : `${classes.length} CLASS`;
   checkReady();
+}
+
+async function handleExcelFilter(file) {
+  if (!file) return;
+  try {
+    const names = /\.csv$/i.test(file.name) ? await readCsvAColumn(file) : await readXlsxAColumn(file);
+    excelFilterNames = new Set(names.map(normalizedFileToken).filter(Boolean));
+    galleryPage = 0;
+    reviewQueue = [];
+    reviewPos = -1;
+    renderStats();
+    renderGallery();
+    updateToolbarStatus(`XLSX ${excelFilterNames.size}`);
+  } catch (error) {
+    console.warn(error);
+    excelFilterNames = new Set();
+    renderStats();
+    renderGallery();
+    updateToolbarStatus('XLSX LOAD FAIL');
+  }
+}
+
+async function readCsvAColumn(file) {
+  const text = await file.text();
+  return text.split(/\r?\n/).map(line => line.split(',')[0]).filter(Boolean);
+}
+
+async function readXlsxAColumn(file) {
+  const entries = parseZipEntries(new Uint8Array(await file.arrayBuffer()));
+  const sharedStrings = parseSharedStrings(await readZipText(entries, 'xl/sharedStrings.xml'));
+  const sheetName = await findFirstSheetPath(entries);
+  const sheetXml = await readZipText(entries, sheetName);
+  const doc = new DOMParser().parseFromString(sheetXml, 'application/xml');
+  return Array.from(doc.getElementsByTagName('c'))
+    .filter(cell => /^A\d+$/i.test(cell.getAttribute('r') || ''))
+    .map(cell => cellText(cell, sharedStrings))
+    .filter(Boolean);
+}
+
+async function findFirstSheetPath(entries) {
+  const workbook = await readZipText(entries, 'xl/workbook.xml').catch(() => '');
+  const rels = await readZipText(entries, 'xl/_rels/workbook.xml.rels').catch(() => '');
+  if (workbook && rels) {
+    const doc = new DOMParser().parseFromString(workbook, 'application/xml');
+    const sheet = doc.getElementsByTagName('sheet')[0];
+    const relId = sheet?.getAttribute('r:id');
+    if (relId) {
+      const relDoc = new DOMParser().parseFromString(rels, 'application/xml');
+      const rel = Array.from(relDoc.getElementsByTagName('Relationship')).find(item => item.getAttribute('Id') === relId);
+      const target = rel?.getAttribute('Target');
+      if (target) return target.startsWith('/') ? target.slice(1) : `xl/${target}`.replace(/\/[^/]+\/\.\.\//, '/');
+    }
+  }
+  return 'xl/worksheets/sheet1.xml';
+}
+
+function parseSharedStrings(xml) {
+  if (!xml) return [];
+  const doc = new DOMParser().parseFromString(xml, 'application/xml');
+  return Array.from(doc.getElementsByTagName('si')).map(si => Array.from(si.getElementsByTagName('t')).map(t => t.textContent || '').join(''));
+}
+
+function cellText(cell, sharedStrings) {
+  const value = cell.getElementsByTagName('v')[0]?.textContent || '';
+  if (cell.getAttribute('t') === 's') return sharedStrings[Number(value)] || '';
+  const inline = cell.getElementsByTagName('t')[0]?.textContent;
+  return inline || value;
+}
+
+function parseZipEntries(bytes) {
+  const entries = new Map();
+  const eocdOffset = findZipEocd(bytes);
+  if (eocdOffset < 0) throw new Error('xlsx_zip_eocd_not_found');
+  const eocd = new DataView(bytes.buffer, bytes.byteOffset + eocdOffset);
+  const entryCount = eocd.getUint16(10, true);
+  let offset = eocd.getUint32(16, true);
+  for (let i = 0; i < entryCount; i++) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset + offset);
+    if (view.getUint32(0, true) !== 0x02014b50) break;
+    const method = view.getUint16(10, true);
+    const compressedSize = view.getUint32(20, true);
+    const uncompressedSize = view.getUint32(24, true);
+    const nameLength = view.getUint16(28, true);
+    const extraLength = view.getUint16(30, true);
+    const commentLength = view.getUint16(32, true);
+    const localOffset = view.getUint32(42, true);
+    const nameStart = offset + 46;
+    const name = new TextDecoder().decode(bytes.slice(nameStart, nameStart + nameLength));
+    const local = new DataView(bytes.buffer, bytes.byteOffset + localOffset);
+    const localNameLength = local.getUint16(26, true);
+    const localExtraLength = local.getUint16(28, true);
+    const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+    entries.set(name, {
+      method,
+      uncompressedSize,
+      data: bytes.slice(dataStart, dataStart + compressedSize)
+    });
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+function findZipEocd(bytes) {
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 66000); i--) {
+    if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06) return i;
+  }
+  return -1;
+}
+
+async function readZipText(entries, name) {
+  const entry = entries.get(name);
+  if (!entry) throw new Error(`missing_zip_entry:${name}`);
+  let data = entry.data;
+  if (entry.method === 8) data = await inflateRaw(data);
+  if (entry.method !== 0 && entry.method !== 8) throw new Error(`unsupported_zip_method:${entry.method}`);
+  return new TextDecoder().decode(data);
+}
+
+async function inflateRaw(bytes) {
+  if (!window.DecompressionStream) throw new Error('xlsx_deflate_not_supported');
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
 async function collectClassIdsFromFile(file) {
@@ -2204,6 +2415,7 @@ async function runValidation() {
     }
   }))).then(() => {
     autoDetectDuplicateBoxes();
+    buildSampleIds();
     // Stable review order (#1, #2, ...) assigned once over the reviewable set
     // (matched + has boxes) in filename order — doesn't shift when the user
     // later filters/searches, so it can be used to find where a paused
@@ -2232,6 +2444,10 @@ async function runValidation() {
     document.getElementById('statusText').textContent = 'READY';
     hideLoading();
   });
+}
+
+function scopedRecords() {
+  return records.filter(record => recordMatchesSample(record) && recordMatchesExcelFilter(record));
 }
 
 function showLoading(text) {
@@ -2407,13 +2623,17 @@ async function parseRecord(record) {
 }
 
 function renderStats() {
-  const matched = records.filter(r => r.status === 'matched').length;
-  const zero = records.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length;
-  const duplicate = records.filter(r => r.status === 'matched' && isDuplicate(r)).length;
-  const boxes = records.reduce((sum, r) => sum + r.boxes.length, 0);
-  const reviewed = records.filter(r => r.status === 'matched' && (reviewedSet.has(r.id) || issueMap.has(r.id))).length;
-  const issueCount = Array.from(issueMap.values()).reduce((sum, issue) => sum + (issue.issues?.length || (issue.types?.length ? 1 : 0)), 0);
-  document.getElementById('statImages').textContent = imageFiles.length;
+  const scoped = scopedRecords();
+  const scopedIds = new Set(scoped.map(r => r.id));
+  const matched = scoped.filter(r => r.status === 'matched').length;
+  const zero = scoped.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length;
+  const duplicate = scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length;
+  const boxes = scoped.reduce((sum, r) => sum + r.boxes.length, 0);
+  const reviewed = scoped.filter(r => r.status === 'matched' && (reviewedSet.has(r.id) || issueMap.has(r.id))).length;
+  const issueCount = Array.from(issueMap.values())
+    .filter(issue => scopedIds.has(issue.id))
+    .reduce((sum, issue) => sum + (issue.issues?.length || (issue.types?.length ? 1 : 0)), 0);
+  document.getElementById('statImages').textContent = scoped.filter(r => r.imageFile).length;
   document.getElementById('statMatched').textContent = matched;
   document.getElementById('statZero').textContent = zero;
   document.getElementById('statDuplicate').textContent = duplicate;
@@ -2424,6 +2644,7 @@ function renderStats() {
   document.querySelectorAll('[data-gallery-filter]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.galleryFilter === galleryFilter);
   });
+  updateToolbarStatus();
 }
 
 function isReviewed(record) {
@@ -2525,7 +2746,7 @@ function setGalleryFilter(value) {
 function filteredRecords() {
   const q = document.getElementById('searchInput').value.trim().normalize('NFC').toLowerCase();
   const f = galleryFilter;
-  return records.filter(r => {
+  return scopedRecords().filter(r => {
     if (f === 'all') {
       if (!r.imageFile) return false;
     } else if (r.status !== 'matched') return false;
@@ -2585,7 +2806,7 @@ function thumbOrderLabel(record) {
 function duplicateVariantRows() {
   const q = document.getElementById('searchInput').value.trim().normalize('NFC').toLowerCase();
   const rows = [];
-  records.forEach(r => {
+  scopedRecords().forEach(r => {
     if (r.status !== 'matched' || !isDuplicate(r)) return;
     const haystack = [r.baseName, r.imageFile?.name || '', r.labelFile?.name || ''].join(' ').normalize('NFC').toLowerCase();
     if (q && !haystack.includes(q)) return;
@@ -3587,7 +3808,9 @@ function issueMatrixCell(issues, type) {
 function buildIssueMatrixRows() {
   const issueTypes = ISSUE_TYPES.map(([value]) => value);
   const rows = [['file', ...issueTypes.map(issueTypeLabel), 'NOTE']];
+  const scopedIds = new Set(scopedRecords().map(record => record.id));
   Array.from(issueMap.values())
+    .filter(group => scopedIds.has(group.id))
     .sort((a, b) => String(a.file || '').localeCompare(String(b.file || ''), 'ko', { numeric: true, sensitivity: 'base' }))
     .forEach(group => {
       const issues = group.issues || [];
@@ -3606,7 +3829,7 @@ function buildIssueMatrixRows() {
 // zero-box counts are still surfaced as summary numbers (see exportJson)
 // instead of drowning the useful rows in thousands of source-photo noise.
 function reviewableRecords() {
-  return records.filter(r => r.status === 'matched' && r.boxes.length > 0 && !isDuplicate(r));
+  return scopedRecords().filter(r => r.status === 'matched' && r.boxes.length > 0 && !isDuplicate(r));
 }
 
 // ---------------------------------------------------------------------
@@ -3785,19 +4008,25 @@ function exportCsv() {
 
 function exportJson() {
   const reviewable = reviewableRecords();
-  const issueCount = Array.from(issueMap.values()).reduce((sum, issue) => sum + (issue.issues?.length || (issue.types?.length ? 1 : 0)), 0);
+  const scoped = scopedRecords();
+  const scopedIds = new Set(scoped.map(r => r.id));
+  const issueCount = Array.from(issueMap.values())
+    .filter(issue => scopedIds.has(issue.id))
+    .reduce((sum, issue) => sum + (issue.issues?.length || (issue.types?.length ? 1 : 0)), 0);
   const payload = {
     exportedAt: new Date().toISOString(),
     summary: {
-      images: imageFiles.length,
+      images: scoped.filter(r => r.imageFile).length,
       labels: labelFiles.length,
-      matched: records.filter(r => r.status === 'matched').length,
+      matched: scoped.filter(r => r.status === 'matched').length,
       reviewable: reviewable.length,
-      zeroBox: records.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length,
-      duplicateFilenames: records.filter(r => r.status === 'matched' && isDuplicate(r)).length,
-      boxes: records.reduce((sum, r) => sum + r.boxes.length, 0),
+      zeroBox: scoped.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length,
+      duplicateFilenames: scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length,
+      boxes: scoped.reduce((sum, r) => sum + r.boxes.length, 0),
       issues: issueCount,
-      reviewed: reviewable.filter(isReviewed).length
+      reviewed: reviewable.filter(isReviewed).length,
+      sampleMode,
+      excelFilterCount: excelFilterNames.size
     },
     records: reviewable.map(r => ({
       order: r.order,
@@ -3807,21 +4036,23 @@ function exportJson() {
       ...(issueMap.get(r.id) || {})
     })),
     unreviewedFiles: reviewable.filter(r => !isReviewed(r)).map(r => r.baseName),
-    zeroBoxFiles: records.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).map(r => r.baseName),
-    duplicateFiles: records.filter(r => r.status === 'matched' && isDuplicate(r)).map(r => ({
+    zeroBoxFiles: scoped.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).map(r => r.baseName),
+    duplicateFiles: scoped.filter(r => r.status === 'matched' && isDuplicate(r)).map(r => ({
       file: r.baseName,
       duplicateImages: r.duplicateImages,
       duplicateLabels: r.duplicateLabels,
       labelVariants: r.labelVariants
     })),
-    missingImages: records.filter(r => r.status === 'missing-image').map(r => r.baseName),
-    missingLabels: records.filter(r => r.status === 'missing-label').map(r => r.baseName)
+    missingImages: scoped.filter(r => r.status === 'missing-image').map(r => r.baseName),
+    missingLabels: scoped.filter(r => r.status === 'missing-label').map(r => r.baseName)
   };
   downloadBlob(JSON.stringify(payload, null, 2), 'bbox_qc_result.json', 'application/json;charset=utf-8');
 }
 
 function feedbackRows() {
+  const scopedIds = new Set(scopedRecords().map(record => record.id));
   return Array.from(issueMap.values())
+    .filter(group => scopedIds.has(group.id))
     .flatMap(group => {
       const record = records.find(item => item.id === group.id);
       if (!record || !record.imageFile) return [];
@@ -4224,6 +4455,9 @@ function resetAll() {
   galleryPage = 0;
   lastGalleryRows = [];
   consistencyRows = [];
+  excelFilterNames = new Set();
+  sampleMode = 'all';
+  sampleIds = new Set();
   classLineWidths = {};
   imageFiles = [];
   labelFiles = [];
@@ -4237,6 +4471,8 @@ function resetAll() {
   reviewedSet.clear();
   imageInput.value = '';
   labelInput.value = '';
+  excelFilterInput.value = '';
+  document.getElementById('sampleModeSelect').value = 'all';
   imageDrop.classList.remove('loaded');
   labelDrop.classList.remove('loaded');
   imageDrop.querySelector('strong').textContent = 'SELECT IMAGE';
@@ -4254,6 +4490,7 @@ function resetAll() {
   document.getElementById('mainCanvas').height = 1;
   document.getElementById('posCounter').textContent = '';
   document.getElementById('statusText').textContent = 'IMAGE / LABEL';
+  updateToolbarStatus();
   updateClassSummary();
   renderStats();
   renderIssuesList();
