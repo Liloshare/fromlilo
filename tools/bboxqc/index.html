@@ -276,13 +276,34 @@
     }
     .pager-actions { display: flex; gap: 6px; align-items: center; }
     .pager-actions button { min-height: 28px; padding: 4px 9px; }
+    .pager-tools {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .pager-tools select {
+      width: auto;
+      min-width: 76px;
+      min-height: 28px;
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .pager-tools button { min-height: 28px; padding: 4px 9px; }
+    .bulk-selected-count {
+      color: var(--ink);
+      font-size: 11px;
+      min-width: 48px;
+    }
     .page-number.active { background: var(--accent); border-color: var(--accent); color: #050505; }
     .page-ellipsis { padding: 4px 2px; color: var(--muted); }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      grid-template-columns: repeat(var(--gallery-cols, 5), minmax(0, 1fr));
       gap: 10px;
+      user-select: none;
     }
     .gallery-empty {
       grid-column: 1 / -1;
@@ -306,7 +327,33 @@
     .thumb.zero-box { border-color: var(--muted); }
     .thumb.active { border-color: var(--accent); }
     .thumb.reviewed { border-color: var(--ok); }
-    .thumb.issue { border-color: var(--danger); }
+    .thumb.issue {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 2px rgba(209,99,125,.18), 0 8px 18px rgba(209,99,125,.16);
+    }
+    .thumb.bulk-selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(107,132,220,.22), 0 8px 18px rgba(107,132,220,.12);
+    }
+    .thumb.bulk-selected::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,.28);
+      z-index: 3;
+      pointer-events: none;
+    }
+    .thumb-check {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 5;
+      width: 20px;
+      height: 20px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .thumb.has-check .thumb-order { left: 34px; max-width: calc(100% - 42px); }
     .thumb-order {
       position: absolute;
       top: 8px;
@@ -1461,7 +1508,7 @@
           <label>LABEL</label>
           <div class="drop" id="labelDrop">
             <strong>SELECT LABEL</strong>
-            <span>YOLO TXT</span>
+            <span>YOLO TXT / COCO JSON / LABELME JSON</span>
           </div>
           <input id="labelInput" type="file" webkitdirectory multiple>
         </div>
@@ -1473,6 +1520,7 @@
               <option value="">PROJECT CLASS</option>
               <option value="ship_task1">ship_task1</option>
               <option value="ship_task2">ship_task2</option>
+              <option value="vehicle_defect">vehicle_defect</option>
             </select>
             <button type="button" onclick="applyClassPreset()">LOAD</button>
           </div>
@@ -1522,6 +1570,20 @@
       <div class="class-chip-row" id="classChipRow"></div>
       <div class="pager gallery-pager">
         <span id="pageInfo">0 / 0</span>
+        <div class="pager-tools">
+          <select id="galleryColumnsSelect" aria-label="COLUMNS">
+            <option value="3">3 COL</option>
+            <option value="4">4 COL</option>
+            <option value="5" selected>5 COL</option>
+            <option value="6">6 COL</option>
+            <option value="8">8 COL</option>
+          </select>
+          <select id="bulkIssueTypeSelect" aria-label="BULK ISSUE TYPE">
+            <option value="">ISSUE</option>
+          </select>
+          <button type="button" id="bulkIssueSaveBtn">SAVE ISSUE</button>
+          <span class="bulk-selected-count" id="bulkSelectedCount">0 SELECT</span>
+        </div>
         <div class="pager-actions">
           <button class="pager-prev" type="button" onclick="prevGalleryPage()">PREV</button>
           <span id="pageButtonsTop" class="pager-actions"></span>
@@ -1757,6 +1819,21 @@ const CLASS_PRESETS = {
     'sagging',
     'pinhole',
     'light reflection'
+  ],
+  vehicle_defect: [
+    'airvent',
+    'bezel',
+    'cap_black',
+    'cap_ect',
+    'cap_white',
+    'clip',
+    'front',
+    'screw',
+    'switch_dbc',
+    'switch_epb',
+    'switch_pas',
+    'switch_svm',
+    'table'
   ]
 };
 const ISSUE_TYPES = [
@@ -1806,6 +1883,12 @@ let galleryFilter = 'all';
 let excelFilterNames = new Set();
 let sampleMode = 'all';
 let sampleIds = new Set();
+let galleryColumns = 5;
+let bulkSelectedIds = new Set();
+let bulkDragActive = false;
+let bulkDragValue = true;
+let annotationFormat = 'yolo';
+let annotationMap = new Map();
 const userEmail = sessionStorage.getItem('fromliloUserEmail') || localStorage.getItem('fromliloUserEmail') || '';
 let objNamesClasses = [];
 
@@ -1957,6 +2040,14 @@ document.getElementById('sampleModeSelect').addEventListener('change', e => {
   renderGallery();
   updateToolbarStatus();
 });
+document.getElementById('galleryColumnsSelect').addEventListener('change', e => {
+  galleryColumns = Math.max(1, Number(e.target.value) || 5);
+  applyGalleryColumns();
+});
+document.getElementById('bulkIssueSaveBtn').addEventListener('click', saveBulkIssue);
+document.addEventListener('pointerup', () => {
+  bulkDragActive = false;
+});
 document.getElementById('searchInput').addEventListener('input', () => {
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(() => {
@@ -1992,15 +2083,48 @@ function normalizedFileToken(value) {
   return String(value || '').replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, '').trim().normalize('NFC').toLowerCase();
 }
 
+function compactMatchToken(value) {
+  return String(value || '')
+    .replace(/\.[^/.]+$/, '')
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[^0-9a-z가-힣ㄱ-ㅎㅏ-ㅣ]+/g, '');
+}
+
 function filePath(file) {
   return file.webkitRelativePath || file.name;
 }
 
+function imageMatchesAnnotationKey(file, annotationKey) {
+  const annotationToken = compactMatchToken(annotationKey);
+  const pathToken = compactMatchToken(filePath(file));
+  const nameToken = compactMatchToken(file.name);
+  if (!annotationToken || !nameToken) return false;
+  return annotationToken.includes(nameToken) || pathToken.includes(annotationToken) || annotationToken.includes(pathToken);
+}
+
+function imagesForKey(key) {
+  const exact = imageMap.get(key) || [];
+  if (exact.length || annotationFormat === 'yolo') return exact;
+  return imageFiles.filter(file => imageMatchesAnnotationKey(file, key));
+}
+
+function setAnnotationClasses(names) {
+  const next = Array.from(new Set(names.map(name => String(name || '').trim()).filter(Boolean)));
+  if (!next.length) return;
+  document.getElementById('classInput').value = next.join('\n');
+  readClassInput();
+  renderClassControls();
+  updateClassSummary();
+}
+
 function recordMatchesExcelFilter(record) {
   if (!excelFilterNames.size) return true;
+  const tokens = Array.from(excelFilterNames);
   return [record.baseName, record.imageFile?.name, record.labelFile?.name]
     .filter(Boolean)
-    .some(name => excelFilterNames.has(normalizedFileToken(name)));
+    .map(normalizedFileToken)
+    .some(name => tokens.some(token => name.includes(token) || token.includes(name)));
 }
 
 function recordMatchesSample(record) {
@@ -2148,6 +2272,14 @@ function handleImages(files) {
 
 async function handleLabels(files) {
   const all = Array.from(files);
+  const jsonFiles = all.filter(f => /\.json$/i.test(f.name));
+  annotationMap = new Map();
+  if (jsonFiles.length) {
+    await handleJsonAnnotations(jsonFiles);
+    checkReady();
+    return;
+  }
+  annotationFormat = 'yolo';
   const yoloTxt = all.filter(f => /\.txt$/i.test(f.name) && !/^(train|test|valid|classes)\.txt$/i.test(f.name));
   const objTrainTxt = yoloTxt.filter(f => filePath(f).split(/[\\/]/).includes('obj_train_data'));
   labelFiles = objTrainTxt.length ? objTrainTxt : yoloTxt;
@@ -2163,6 +2295,135 @@ async function handleLabels(files) {
   labelDrop.querySelector('strong').textContent = `LBL ${labelFiles.length}`;
   labelDrop.querySelector('span').textContent = objNames ? `OBJ.NAMES / ${classes.length} CLASS` : `${classes.length} CLASS`;
   checkReady();
+}
+
+async function handleJsonAnnotations(jsonFiles) {
+  labelFiles = jsonFiles;
+  const first = JSON.parse(await jsonFiles[0].text());
+  if (Array.isArray(first.images) && Array.isArray(first.annotations)) {
+    annotationFormat = 'coco';
+    await buildCocoAnnotationMap(jsonFiles);
+    labelDrop.classList.add('loaded');
+    labelDrop.querySelector('strong').textContent = `COCO ${annotationMap.size}`;
+    labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON`;
+    return;
+  }
+
+  annotationFormat = 'labelme';
+  await buildLabelMeAnnotationMap(jsonFiles);
+  labelDrop.classList.add('loaded');
+  labelDrop.querySelector('strong').textContent = `LABELME ${annotationMap.size}`;
+  labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON`;
+}
+
+async function buildCocoAnnotationMap(files) {
+  const grouped = new Map();
+  const classNames = [];
+  for (const file of files) {
+    const coco = JSON.parse(await file.text());
+    if (!Array.isArray(coco.images) || !Array.isArray(coco.annotations)) continue;
+    const categoryById = new Map((coco.categories || []).map(cat => [cat.id, cat.name || String(cat.id)]));
+    classNames.push(...Array.from(categoryById.values()));
+    const imageById = new Map((coco.images || []).map(image => [image.id, image]));
+    (coco.images || []).forEach(image => {
+      const key = normalizedStem(image.file_name || '');
+      if (key && !grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
+    });
+    (coco.annotations || []).forEach((ann, idx) => {
+      const image = imageById.get(ann.image_id);
+      if (!image) return;
+      const key = normalizedStem(image.file_name || '');
+      if (!grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
+      const className = categoryById.get(ann.category_id) || String(ann.category_id);
+      grouped.get(key).boxes.push(...cocoAnnotationShapes(ann, className, idx + 1, image.width, image.height));
+    });
+  }
+  setAnnotationClasses(classNames);
+  annotationMap = grouped;
+}
+
+function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
+  const shapes = [];
+  const segmentations = Array.isArray(ann.segmentation) ? ann.segmentation : [];
+  segmentations.forEach(points => {
+    if (!Array.isArray(points) || points.length < 6) return;
+    shapes.push(makePolygonShape(className, pointsToPairs(points), row, imgW, imgH));
+  });
+  if (!shapes.length && Array.isArray(ann.bbox) && ann.bbox.length >= 4) {
+    const [x, y, w, h] = ann.bbox.map(Number);
+    if ([x, y, w, h].every(Number.isFinite) && imgW && imgH) {
+      shapes.push({
+        type: 'bbox',
+        className,
+        classId: classes.indexOf(className),
+        xc: (x + w / 2) / imgW,
+        yc: (y + h / 2) / imgH,
+        bw: w / imgW,
+        bh: h / imgH,
+        row
+      });
+    }
+  }
+  return shapes;
+}
+
+async function buildLabelMeAnnotationMap(files) {
+  const grouped = new Map();
+  const classNames = [];
+  for (const file of files) {
+    const data = JSON.parse(await file.text());
+    const key = normalizedStem(data.imagePath || file.name);
+    const imgW = Number(data.imageWidth) || null;
+    const imgH = Number(data.imageHeight) || null;
+    const boxes = (data.shapes || []).flatMap((shape, idx) => {
+      const className = String(shape.label || 'LABEL');
+      classNames.push(className);
+      if (shape.shape_type === 'rectangle' && Array.isArray(shape.points) && shape.points.length >= 2) {
+        return [rectangleToShape(className, shape.points, idx + 1, imgW, imgH)];
+      }
+      if (Array.isArray(shape.points) && shape.points.length >= 3) {
+        return [makePolygonShape(className, shape.points, idx + 1, imgW, imgH)];
+      }
+      return [];
+    }).filter(Boolean);
+    grouped.set(key, { file, image: { file_name: data.imagePath, width: imgW, height: imgH }, boxes });
+  }
+  setAnnotationClasses(classNames);
+  annotationMap = grouped;
+}
+
+function pointsToPairs(points) {
+  const pairs = [];
+  for (let i = 0; i < points.length - 1; i += 2) pairs.push([Number(points[i]), Number(points[i + 1])]);
+  return pairs;
+}
+
+function makePolygonShape(className, points, row, imgW, imgH) {
+  const clean = points.map(([x, y]) => [Number(x), Number(y)]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+  const xs = clean.map(p => p[0]);
+  const ys = clean.map(p => p[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  return {
+    type: 'polygon',
+    className,
+    classId: classes.indexOf(className),
+    points: clean.map(([x, y]) => ({ x: imgW ? x / imgW : x, y: imgH ? y / imgH : y })),
+    xc: imgW ? (minX + maxX) / 2 / imgW : 0,
+    yc: imgH ? (minY + maxY) / 2 / imgH : 0,
+    bw: imgW ? (maxX - minX) / imgW : 0,
+    bh: imgH ? (maxY - minY) / imgH : 0,
+    row
+  };
+}
+
+function rectangleToShape(className, points, row, imgW, imgH) {
+  const [[x1, y1], [x2, y2]] = points;
+  const x = Math.min(Number(x1), Number(x2));
+  const y = Math.min(Number(y1), Number(y2));
+  const w = Math.abs(Number(x2) - Number(x1));
+  const h = Math.abs(Number(y2) - Number(y1));
+  if (![x, y, w, h].every(Number.isFinite) || !imgW || !imgH) return null;
+  return { type: 'bbox', className, classId: classes.indexOf(className), xc: (x + w / 2) / imgW, yc: (y + h / 2) / imgH, bw: w / imgW, bh: h / imgH, row };
 }
 
 async function handleExcelFilter(file) {
@@ -2360,6 +2621,7 @@ async function runValidation() {
   records = [];
   issueMap.clear();
   reviewedSet.clear();
+  bulkSelectedIds.clear();
   reviewQueue = [];
   reviewPos = -1;
   imageMap = new Map();
@@ -2377,16 +2639,31 @@ async function runValidation() {
     imageMap.get(key).push(file);
   }
   for (const file of labelFiles) {
-    const key = normalizedStem(file.name);
-    if (!labelMap.has(key)) labelMap.set(key, []);
-    labelMap.get(key).push(file);
+    if (annotationFormat === 'yolo') {
+      const key = normalizedStem(file.name);
+      if (!labelMap.has(key)) labelMap.set(key, []);
+      labelMap.get(key).push(file);
+    }
+  }
+  if (annotationFormat !== 'yolo') {
+    annotationMap.forEach((entry, key) => labelMap.set(key, [entry.file]));
   }
 
-  const allKeys = new Set([...imageMap.keys(), ...labelMap.keys()]);
+  let allKeys = new Set([...imageMap.keys(), ...labelMap.keys()]);
+  if (annotationFormat !== 'yolo') {
+    const matchedImageKeys = new Set();
+    labelMap.forEach((_, key) => {
+      imagesForKey(key).forEach(file => matchedImageKeys.add(normalizedStem(file.name)));
+    });
+    allKeys = new Set([
+      ...labelMap.keys(),
+      ...Array.from(imageMap.keys()).filter(key => !matchedImageKeys.has(key))
+    ]);
+  }
   const sortedKeys = Array.from(allKeys).sort((a, b) => a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' }));
 
   for (const key of sortedKeys) {
-    const images = imageMap.get(key) || [];
+    const images = imagesForKey(key);
     const labels = labelMap.get(key) || [];
     const status = images.length && labels.length ? 'matched' : images.length ? 'missing-label' : 'missing-image';
     records.push({
@@ -2610,6 +2887,14 @@ async function parseBoxesFromFile(file) {
 }
 
 async function parseRecord(record) {
+  if (annotationFormat !== 'yolo') {
+    const entry = annotationMap.get(record.id);
+    if (!entry) return;
+    record.boxes = entry.boxes || [];
+    record.labelFile = entry.file || record.labelFile;
+    if (entry.image?.width && entry.image?.height) record.imageSize = { width: entry.image.width, height: entry.image.height };
+    return;
+  }
   if (record.duplicateLabels > 0) {
     record.labelVariants = await Promise.all(record.allLabelFiles.map(async f => {
       const { boxes } = await parseBoxesFromFile(f);
@@ -2748,7 +3033,7 @@ function filteredRecords() {
   const f = galleryFilter;
   return scopedRecords().filter(r => {
     if (f === 'all') {
-      if (!r.imageFile) return false;
+      if (!r.imageFile && annotationFormat === 'yolo') return false;
     } else if (r.status !== 'matched') return false;
     const dup = isDuplicate(r);
     if (f === 'all') {
@@ -2829,6 +3114,7 @@ function duplicateVariantRows() {
 
 function renderGallery() {
   const gallery = document.getElementById('gallery');
+  applyGalleryColumns();
   gallery.innerHTML = '';
   galleryThumbMap.clear();
   if (galleryObserver) galleryObserver.disconnect();
@@ -2860,7 +3146,9 @@ function renderGallery() {
   rows.forEach(record => {
     const card = document.createElement('div');
     card.className = thumbClassName(record);
+    card.dataset.bulkId = bulkRecordId(record);
     card.innerHTML = `
+      <input class="thumb-check" type="checkbox" aria-label="SELECT IMAGE" ${bulkSelectedIds.has(bulkRecordId(record)) ? 'checked' : ''}>
       <div class="thumb-order">${thumbOrderLabel(record)}</div>
       <canvas></canvas>
       <div class="thumb-foot">
@@ -2868,9 +3156,40 @@ function renderGallery() {
         <div class="thumb-meta"><span>${statusLabel(record)}</span><span>${record.boxes.length} boxes</span></div>
       </div>
     `;
+    card.classList.add('has-check');
     const canvas = card.querySelector('canvas');
+    const check = card.querySelector('.thumb-check');
     canvas.dataset.recordId = record.id;
-    card.addEventListener('click', () => {
+    check.addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+      event.preventDefault();
+      bulkDragActive = true;
+      bulkDragValue = !bulkSelectedIds.has(bulkRecordId(record));
+      setBulkSelected(record, bulkDragValue);
+      updateBulkSelectionUi();
+    });
+    check.addEventListener('click', event => {
+      event.stopPropagation();
+      event.preventDefault();
+    });
+    card.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || event.target.closest('.thumb-check')) return;
+      event.preventDefault();
+      bulkDragActive = true;
+      bulkDragValue = !bulkSelectedIds.has(bulkRecordId(record));
+      setBulkSelected(record, bulkDragValue);
+      updateBulkSelectionUi();
+    });
+    card.addEventListener('pointerenter', () => {
+      if (!bulkDragActive) return;
+      setBulkSelected(record, bulkDragValue);
+      updateBulkSelectionUi();
+    });
+    card.addEventListener('click', event => {
+      event.preventDefault();
+    });
+    card.addEventListener('dblclick', (event) => {
+      event.preventDefault();
       if (record.isVariant) {
         openCompareView(record.parentRecord);
         return;
@@ -2884,10 +3203,77 @@ function renderGallery() {
     galleryThumbMap.set(record.id, { card, canvas, record });
     galleryObserver.observe(canvas);
   });
+  updateBulkSelectionUi();
 }
 
 function resetGalleryPageAndRender() {
   galleryPage = 0;
+  renderGallery();
+}
+
+function applyGalleryColumns() {
+  const gallery = document.getElementById('gallery');
+  if (gallery) gallery.style.setProperty('--gallery-cols', String(galleryColumns));
+}
+
+function bulkRecordId(record) {
+  return record?.isVariant ? record.parentRecord.id : record?.id;
+}
+
+function setBulkSelected(record, selected) {
+  const id = bulkRecordId(record);
+  if (!id || record?.isVariant) return;
+  if (selected) bulkSelectedIds.add(id);
+  else bulkSelectedIds.delete(id);
+}
+
+function updateBulkSelectionUi() {
+  galleryThumbMap.forEach(({ card, record }) => {
+    const selected = bulkSelectedIds.has(bulkRecordId(record));
+    card.classList.toggle('bulk-selected', selected);
+    const check = card.querySelector('.thumb-check');
+    if (check) check.checked = selected;
+  });
+  const count = document.getElementById('bulkSelectedCount');
+  if (count) count.textContent = `${bulkSelectedIds.size} SELECT`;
+}
+
+function populateBulkIssueTypes() {
+  const select = document.getElementById('bulkIssueTypeSelect');
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = '<option value="">ISSUE</option>';
+  ISSUE_TYPES.forEach(([value, label]) => {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    select.appendChild(opt);
+  });
+  if (current && ISSUE_TYPES.some(([value]) => value === current)) select.value = current;
+}
+
+function saveBulkIssue() {
+  const ids = Array.from(bulkSelectedIds);
+  if (!ids.length) return;
+  const type = document.getElementById('bulkIssueTypeSelect').value;
+  const batchKey = `${Date.now()}:${type || 'issue'}`;
+  ids.forEach(id => {
+    const record = records.find(item => item.id === id);
+    if (!record || record.isVariant) return;
+    upsertIssue(record, {
+      target: { type: 'image' },
+      targetKey: `bulk:${batchKey}`,
+      targetLabel: 'IMAGE',
+      types: type ? [type] : [],
+      missingClass: '',
+      note: type ? 'BULK ISSUE' : 'BULK ISSUE CHECK'
+    }, false);
+    reviewedSet.add(record.id);
+  });
+  bulkSelectedIds.clear();
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
   renderGallery();
 }
 
@@ -2956,6 +3342,10 @@ function goGalleryPage(value) {
 function updateGalleryHighlights() {
   galleryThumbMap.forEach(({ card, record }) => {
     card.className = thumbClassName(record);
+    card.classList.add('has-check');
+    card.classList.toggle('bulk-selected', bulkSelectedIds.has(bulkRecordId(record)));
+    const check = card.querySelector('.thumb-check');
+    if (check) check.checked = bulkSelectedIds.has(bulkRecordId(record));
   });
 }
 
@@ -3222,13 +3612,12 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
   record.boxes.forEach((box, idx) => {
     if (!visibleClasses.has(box.className)) return;
     const color = classColors[box.className] || '#a8a4bd';
-    const x = (box.xc - box.bw / 2) * imgW * scaleX;
-    const y = (box.yc - box.bh / 2) * imgH * scaleY;
-    const bw = box.bw * imgW * scaleX;
-    const bh = box.bh * imgH * scaleY;
+    const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
     ctx.globalAlpha = isMain ? 0.08 : 0.14;
     ctx.fillStyle = color;
-    ctx.fillRect(x, y, bw, bh);
+    drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
+    if (box.type === 'polygon') ctx.fill();
+    else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     ctx.globalAlpha = 1;
     const canShowSelection = record === records[currentIndex];
     const isActive = canShowSelection && (idx === activeBoxIndex || selectedBoxIndices.has(idx));
@@ -3237,12 +3626,19 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     const baseLineWidth = classLineWidths[box.className] || 2;
     ctx.lineWidth = isActive ? Math.min(5, baseLineWidth + 1) : baseLineWidth;
     ctx.strokeStyle = isActive ? '#ffffff' : color;
-    ctx.strokeRect(x, y, bw, bh);
+    drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
+    if (box.type === 'polygon') ctx.stroke();
+    else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.72;
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(255,255,255,0.82)';
-    ctx.strokeRect(x - 1, y - 1, bw + 2, bh + 2);
+    if (box.type === 'polygon') {
+      drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
+    }
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
     const shouldLabel = !labeledClasses.has(box.className);
@@ -3253,12 +3649,33 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
       const tw = ctx.measureText(label).width;
       const th = Math.max(14, Math.round(canvasW / 58));
       ctx.fillStyle = color;
-      ctx.fillRect(x, Math.max(0, y - th), tw + 10, th);
+      ctx.fillRect(rect.x, Math.max(0, rect.y - th), tw + 10, th);
       ctx.fillStyle = '#050505';
-      ctx.fillText(label, x + 5, Math.max(12, y - 5));
+      ctx.fillText(label, rect.x + 5, Math.max(12, rect.y - 5));
     }
   });
   ctx.restore();
+}
+
+function shapeRect(shape, imgW, imgH, scaleX, scaleY) {
+  return {
+    x: (shape.xc - shape.bw / 2) * imgW * scaleX,
+    y: (shape.yc - shape.bh / 2) * imgH * scaleY,
+    w: shape.bw * imgW * scaleX,
+    h: shape.bh * imgH * scaleY
+  };
+}
+
+function drawShapePath(ctx, shape, imgW, imgH, scaleX, scaleY) {
+  if (shape.type !== 'polygon' || !shape.points?.length) return;
+  ctx.beginPath();
+  shape.points.forEach((point, idx) => {
+    const x = point.x * imgW * scaleX;
+    const y = point.y * imgH * scaleY;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.closePath();
 }
 
 function drawClassBoxes(ctx, record, className, canvasW, canvasH, imgW, imgH) {
@@ -3268,24 +3685,30 @@ function drawClassBoxes(ctx, record, className, canvasW, canvasH, imgW, imgH) {
   record.boxes.forEach((box) => {
     if (box.className !== className) return;
     const color = classColors[box.className] || '#ffcf4a';
-    const x = (box.xc - box.bw / 2) * imgW * scaleX;
-    const y = (box.yc - box.bh / 2) * imgH * scaleY;
-    const bw = box.bw * imgW * scaleX;
-    const bh = box.bh * imgH * scaleY;
+    const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
     ctx.globalAlpha = 0.18;
     ctx.fillStyle = color;
-    ctx.fillRect(x, y, bw, bh);
+    drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
+    if (box.type === 'polygon') ctx.fill();
+    else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     ctx.globalAlpha = 1;
     ctx.shadowColor = color;
     ctx.shadowBlur = 14;
     const baseLineWidth = classLineWidths[box.className] || 2;
     ctx.lineWidth = Math.min(5, baseLineWidth + 2);
     ctx.strokeStyle = '#ffffff';
-    ctx.strokeRect(x, y, bw, bh);
+    drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
+    if (box.type === 'polygon') ctx.stroke();
+    else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
     ctx.shadowBlur = 0;
     ctx.lineWidth = baseLineWidth;
     ctx.strokeStyle = color;
-    ctx.strokeRect(x - 3, y - 3, bw + 6, bh + 6);
+    if (box.type === 'polygon') {
+      drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6);
+    }
   });
   ctx.restore();
 }
@@ -3510,25 +3933,53 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
   record.boxes.forEach((box, idx) => {
     if (!visibleClasses.has(box.className)) return;
     const color = classColors[box.className] || '#a8a4bd';
-    const x = ((box.xc - box.bw / 2) * imgW - sx) * scaleX;
-    const y = ((box.yc - box.bh / 2) * imgH - sy) * scaleY;
-    const w = box.bw * imgW * scaleX;
-    const h = box.bh * imgH * scaleY;
     const isActive = idx === activeBoxIndex || selectedBoxIndices.has(idx);
     ctx.shadowColor = color;
     ctx.shadowBlur = isActive ? 14 : 9;
     const baseLineWidth = classLineWidths[box.className] || 2;
     ctx.lineWidth = isActive ? Math.min(5, baseLineWidth + 1) : baseLineWidth;
     ctx.strokeStyle = isActive ? '#ffffff' : color;
-    ctx.strokeRect(x, y, w, h);
+    drawLensShape(ctx, box, sx, sy, imgW, imgH, scaleX, scaleY);
+    if (box.type === 'polygon') ctx.stroke();
+    else {
+      const rect = lensShapeRect(box, sx, sy, imgW, imgH, scaleX, scaleY);
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    }
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.72;
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(255,255,255,0.82)';
-    ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
+    if (box.type === 'polygon') {
+      drawLensShape(ctx, box, sx, sy, imgW, imgH, scaleX, scaleY);
+      ctx.stroke();
+    } else {
+      const rect = lensShapeRect(box, sx, sy, imgW, imgH, scaleX, scaleY);
+      ctx.strokeRect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
+    }
     ctx.globalAlpha = 1;
   });
   ctx.restore();
+}
+
+function lensShapeRect(shape, sx, sy, imgW, imgH, scaleX, scaleY) {
+  return {
+    x: ((shape.xc - shape.bw / 2) * imgW - sx) * scaleX,
+    y: ((shape.yc - shape.bh / 2) * imgH - sy) * scaleY,
+    w: shape.bw * imgW * scaleX,
+    h: shape.bh * imgH * scaleY
+  };
+}
+
+function drawLensShape(ctx, shape, sx, sy, imgW, imgH, scaleX, scaleY) {
+  if (shape.type !== 'polygon' || !shape.points?.length) return;
+  ctx.beginPath();
+  shape.points.forEach((point, idx) => {
+    const x = (point.x * imgW - sx) * scaleX;
+    const y = (point.y * imgH - sy) * scaleY;
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.closePath();
 }
 initMagnifier();
 
@@ -4455,6 +4906,7 @@ function resetAll() {
   galleryPage = 0;
   lastGalleryRows = [];
   consistencyRows = [];
+  bulkSelectedIds.clear();
   excelFilterNames = new Set();
   sampleMode = 'all';
   sampleIds = new Set();
@@ -4462,6 +4914,8 @@ function resetAll() {
   imageFiles = [];
   labelFiles = [];
   objNamesClasses = [];
+  annotationFormat = 'yolo';
+  annotationMap = new Map();
   records = [];
   currentIndex = -1;
   activeBoxIndex = -1;
@@ -4473,12 +4927,14 @@ function resetAll() {
   labelInput.value = '';
   excelFilterInput.value = '';
   document.getElementById('sampleModeSelect').value = 'all';
+  document.getElementById('galleryColumnsSelect').value = '5';
+  galleryColumns = 5;
   imageDrop.classList.remove('loaded');
   labelDrop.classList.remove('loaded');
   imageDrop.querySelector('strong').textContent = 'SELECT IMAGE';
   imageDrop.querySelector('span').textContent = 'JPG / JPEG / PNG';
   labelDrop.querySelector('strong').textContent = 'SELECT LABEL';
-  labelDrop.querySelector('span').textContent = 'YOLO TXT';
+  labelDrop.querySelector('span').textContent = 'YOLO TXT / COCO JSON / LABELME JSON';
   document.getElementById('classInput').value = '';
   runBtn.disabled = true;
   document.getElementById('csvBtn').disabled = true;
@@ -4491,6 +4947,7 @@ function resetAll() {
   document.getElementById('posCounter').textContent = '';
   document.getElementById('statusText').textContent = 'IMAGE / LABEL';
   updateToolbarStatus();
+  updateBulkSelectionUi();
   updateClassSummary();
   renderStats();
   renderIssuesList();
@@ -4503,6 +4960,7 @@ function escapeHtml(value) {
 readClassInput();
 renderClassControls();
 renderMissingClassOptions();
+populateBulkIssueTypes();
 updateMissingClassVisibility();
 updateClassSummary();
 </script>
