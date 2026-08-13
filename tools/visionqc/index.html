@@ -1514,6 +1514,15 @@
         </div>
 
         <div class="field">
+          <label>CLOUD</label>
+          <div class="class-preset-row">
+            <input id="cloudProjectInput" type="text" placeholder="PROJECT ID">
+            <button type="button" onclick="loadCloudProject()">LOAD</button>
+          </div>
+          <div class="hint" id="cloudStatus">R2 MANIFEST PROJECT</div>
+        </div>
+
+        <div class="field">
           <label>CLASS</label>
           <div class="class-preset-row">
             <select id="classPresetSelect">
@@ -1898,9 +1907,12 @@ const imageDrop = document.getElementById('imageDrop');
 const labelDrop = document.getElementById('labelDrop');
 const excelFilterInput = document.getElementById('excelFilterInput');
 const toolbarStatus = document.getElementById('toolbarStatus');
+const cloudProjectInput = document.getElementById('cloudProjectInput');
+const cloudStatus = document.getElementById('cloudStatus');
 
 function localFileKey(file) {
   if (!file) return '';
+  if (file.r2Key) return file.r2Key;
   return `${file.name}__${file.size}__${file.lastModified}`;
 }
 
@@ -1917,6 +1929,60 @@ function recordSource(record) {
     imageKey: localFileKey(record.imageFile) || record.id,
     imageFilename: record.imageFile?.name || record.baseName
   };
+}
+
+function cloudObjectUrl(key) {
+  return `/api/visionqc-object?key=${encodeURIComponent(key)}`;
+}
+
+function cloudFileFromAsset(asset) {
+  const key = String(asset.key || '');
+  const name = String(asset.name || key.split('/').pop() || key);
+  return {
+    name,
+    webkitRelativePath: String(asset.path || key),
+    size: Number(asset.size || 0),
+    lastModified: asset.lastModified ? Date.parse(asset.lastModified) || 0 : 0,
+    r2Key: key,
+    remoteUrl: cloudObjectUrl(key),
+    async text() {
+      const response = await fetch(this.remoteUrl);
+      if (!response.ok) throw new Error(`cloud_text_load_failed:${key}`);
+      return response.text();
+    },
+    async arrayBuffer() {
+      const response = await fetch(this.remoteUrl);
+      if (!response.ok) throw new Error(`cloud_file_load_failed:${key}`);
+      return response.arrayBuffer();
+    }
+  };
+}
+
+async function loadCloudProject() {
+  const project = cloudProjectInput.value.trim();
+  if (!project) {
+    cloudStatus.textContent = 'PROJECT ID REQUIRED';
+    return;
+  }
+  showLoading('LOAD CLOUD');
+  try {
+    const response = await fetch(`/api/visionqc-project?project=${encodeURIComponent(project)}`);
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) throw new Error(payload.error || 'cloud_project_load_failed');
+    const manifest = payload.manifest || {};
+    const imageAssets = Array.isArray(manifest.images) ? manifest.images : [];
+    const labelAssets = Array.isArray(manifest.labels) ? manifest.labels : [];
+    const classNames = Array.isArray(manifest.classes) ? manifest.classes : [];
+    if (classNames.length) setAnnotationClasses(classNames);
+    handleImages(imageAssets.map(cloudFileFromAsset));
+    await handleLabels(labelAssets.map(cloudFileFromAsset));
+    cloudStatus.textContent = `${project} / IMG ${imageAssets.length} / LABEL ${labelAssets.length}`;
+  } catch (error) {
+    console.warn(error);
+    cloudStatus.textContent = 'CLOUD LOAD FAIL';
+  } finally {
+    hideLoading();
+  }
 }
 
 function actionFromIssue(issue) {
@@ -4869,7 +4935,11 @@ function downloadBlob(content, name, type) {
 function loadImage(file) {
   if (mainImageCache.has(file)) return mainImageCache.get(file);
   const promise = new Promise((resolve, reject) => {
-    if (!objectUrlCache.has(file)) objectUrlCache.set(file, URL.createObjectURL(file));
+    if (file.remoteUrl) {
+      objectUrlCache.set(file, file.remoteUrl);
+    } else if (!objectUrlCache.has(file)) {
+      objectUrlCache.set(file, URL.createObjectURL(file));
+    }
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = reject;

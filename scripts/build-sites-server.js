@@ -166,6 +166,50 @@ async function saveReviewResult(request, env) {
   return Response.json({ ok: true });
 }
 
+function jsonError(error, status = 400) {
+  return Response.json({ ok: false, error }, { status });
+}
+
+function normalizeCloudPath(value) {
+  return String(value || "").trim().replace(/^\\/+|\\/+$/g, "");
+}
+
+async function loadVisionQcProject(request, env) {
+  if (!env || !env.VISION_QC_DATA) return jsonError("missing_r2_binding:VISION_QC_DATA", 501);
+  const url = new URL(request.url);
+  const project = normalizeCloudPath(url.searchParams.get("project"));
+  if (!project || project.includes("..")) return jsonError("invalid_project");
+
+  const key = "projects/" + project + "/manifest.json";
+  const object = await env.VISION_QC_DATA.get(key);
+  if (!object) return jsonError("project_manifest_not_found", 404);
+
+  let manifest;
+  try {
+    manifest = JSON.parse(await object.text());
+  } catch {
+    return jsonError("invalid_manifest_json", 500);
+  }
+
+  return Response.json({ ok: true, project, manifest });
+}
+
+async function loadVisionQcObject(request, env) {
+  if (!env || !env.VISION_QC_DATA) return jsonError("missing_r2_binding:VISION_QC_DATA", 501);
+  const url = new URL(request.url);
+  const key = normalizeCloudPath(url.searchParams.get("key"));
+  if (!key || key.includes("..")) return jsonError("invalid_key");
+
+  const object = await env.VISION_QC_DATA.get(key);
+  if (!object) return jsonError("object_not_found", 404);
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+  headers.set("cache-control", "private, max-age=300");
+  return new Response(object.body, { headers });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -174,6 +218,12 @@ export default {
     }
     if (request.method === "POST" && url.pathname === "/api/review-result") {
       return saveReviewResult(request, env);
+    }
+    if (request.method === "GET" && url.pathname === "/api/visionqc-project") {
+      return loadVisionQcProject(request, env);
+    }
+    if (request.method === "GET" && url.pathname === "/api/visionqc-object") {
+      return loadVisionQcObject(request, env);
     }
     const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
     return serveAsset(pathname);
