@@ -315,6 +315,11 @@ h1 {
   margin-top: 24px;
 }
 
+.intro-start {
+  align-self: flex-start;
+  margin-top: 26px;
+}
+
 .dot {
   width: 8px;
   height: 8px;

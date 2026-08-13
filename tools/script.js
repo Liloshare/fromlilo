@@ -5,13 +5,14 @@ const authStatus = document.querySelector("#authStatus");
 const workspace = document.querySelector("#workspace");
 const workspaceText = document.querySelector("#workspaceText");
 const startToolButton = document.querySelector("#startToolButton");
+const introStartButton = document.querySelector("#introStartButton");
 const introText = document.querySelector("#introText");
 const dots = Array.from(document.querySelectorAll(".dot"));
 
 const slides = [
   "이미지와 라벨 파일을 업로드하고, 클래스와 박스 오류를 한 화면에서 확인합니다.",
   "검수 기준에 맞지 않는 박스와 누락 가능성이 있는 데이터를 빠르게 찾습니다.",
-  "바로 Vision QC 화면으로 이동해 검수 작업을 시작할 수 있습니다."
+  "로컬 파일 또는 클라우드 프로젝트를 불러와 검수 작업을 시작할 수 있습니다."
 ];
 
 let slideIndex = 0;
@@ -49,9 +50,14 @@ qcToolButton.addEventListener("click", showIntro);
 closeIntroButton.addEventListener("click", () => {
   clearInterval(carouselTimer);
   introModal.classList.add("hidden");
-  activateTool();
 });
 
 startToolButton.addEventListener("click", () => {
-  window.location.href = "./visionqc/";
+  showIntro();
+});
+
+introStartButton.addEventListener("click", () => {
+  clearInterval(carouselTimer);
+  introModal.classList.add("hidden");
+  activateTool();
 });
