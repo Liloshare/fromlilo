@@ -2010,7 +2010,7 @@ let issueTarget = null;
 let selectedBoxIndices = new Set();
 let missingArrowMode = false;
 let missingArrowDraft = null;
-let missingArrowPending = null;
+let missingArrowPending = [];
 
 // review-mode ("하나씩 넘기기") navigation queue, snapshot of the filtered list at the
 // moment review mode was entered so marking a record OK/issue doesn't yank it out from
@@ -3631,6 +3631,7 @@ function loadThumbBitmap(file) {
 
 function selectRecord(index) {
   if (index < 0 || index >= records.length) return;
+  cancelMissingArrow(false);
   currentIndex = index;
   activeBoxIndex = -1;
   issueTarget = null;
@@ -3724,6 +3725,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { hideIssuePopup(); closeConsistencyBoard(); closeCompareView(); exitReviewMode(); return; }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
+    if (missingArrowMode) {
+      confirmMissingArrow();
+      return;
+    }
     markOk();
     return;
   }
@@ -3832,7 +3837,7 @@ async function renderCanvas(canvas, record, maxWidth, isMain = false) {
     drawBoxes(ctx, record, w, h, img.naturalWidth, img.naturalHeight, isMain);
   }
   if (isMain) drawSavedMissingArrows(ctx, record, w, h);
-  if (isMain && missingArrowPending) drawFeedbackShape(ctx, missingArrowPending, w, h, true);
+  if (isMain) drawPendingMissingArrows(ctx, w, h);
 }
 
 function toggleMainViewMode() {
@@ -3851,6 +3856,7 @@ function updateMainViewToggleBtn() {
   document.getElementById('overlayModeBtn')?.classList.toggle('active', mainViewMode === 'overlay');
   document.getElementById('imageModeBtn')?.classList.toggle('active', mainViewMode === 'image');
 }
+updateMainViewToggleBtn();
 
 function setReviewToolMode(mode) {
   reviewToolMode = mode === 'select' ? 'select' : 'magnifier';
@@ -3935,8 +3941,12 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
 function drawSavedMissingArrows(ctx, record, canvasW, canvasH) {
   const issues = getRecordIssue(record)?.issues || [];
   issues
-    .filter(issue => (issue.types || []).includes('missing') && issue.arrow)
-    .forEach(issue => drawFeedbackShape(ctx, issue.arrow, canvasW, canvasH, false));
+    .filter(issue => (issue.types || []).includes('missing') && (issue.arrow || issue.arrows?.length))
+    .forEach(issue => (issue.arrows || [issue.arrow]).filter(Boolean).forEach(arrow => drawFeedbackShape(ctx, arrow, canvasW, canvasH, false)));
+}
+
+function drawPendingMissingArrows(ctx, canvasW, canvasH) {
+  missingArrowPending.forEach(arrow => drawFeedbackShape(ctx, arrow, canvasW, canvasH, true));
 }
 
 function shapeRect(shape, imgW, imgH, scaleX, scaleY) {
@@ -4301,16 +4311,16 @@ async function finishMissingArrow(e) {
   const point = canvasPoint(e, canvas);
   missingArrowDraft.x2 = point.x;
   missingArrowDraft.y2 = point.y;
-  missingArrowPending = { ...missingArrowDraft };
+  missingArrowPending.push({ ...missingArrowDraft });
   missingArrowDraft = null;
   renderMissingArrowControls(true);
   await renderCurrent();
 }
 
-async function saveMissingArrowIssue(arrow) {
+async function saveMissingArrowIssue(arrows) {
   const record = records[currentIndex];
   if (!record) return;
-  const imageData = await renderMissingIssueImage(record, arrow);
+  const imageData = await renderMissingIssueImage(record, arrows);
   upsertIssue(record, {
     target: { type: 'image' },
     targetKey: `image:missing:${Date.now()}`,
@@ -4318,7 +4328,8 @@ async function saveMissingArrowIssue(arrow) {
     types: ['missing'],
     missingClass: '',
     note: '',
-    arrow,
+    arrow: arrows[0] || null,
+    arrows,
     imageData
   });
   reviewedSet.add(record.id);
@@ -4331,20 +4342,19 @@ async function saveMissingArrowIssue(arrow) {
 }
 
 async function confirmMissingArrow() {
-  if (!missingArrowPending) return;
-  const arrow = { ...missingArrowPending };
+  const arrows = missingArrowPending.map(arrow => ({ ...arrow }));
   missingArrowMode = false;
-  missingArrowPending = null;
+  missingArrowPending = [];
   renderMissingArrowControls(false);
-  await saveMissingArrowIssue(arrow);
+  await saveMissingArrowIssue(arrows);
 }
 
-function cancelMissingArrow() {
+function cancelMissingArrow(shouldRender = true) {
   missingArrowMode = false;
   missingArrowDraft = null;
-  missingArrowPending = null;
+  missingArrowPending = [];
   renderMissingArrowControls(false);
-  renderCurrent();
+  if (shouldRender) renderCurrent();
 }
 
 function renderMissingArrowControls(show) {
@@ -4353,16 +4363,16 @@ function renderMissingArrowControls(show) {
   if (!field) return;
   field.classList.toggle('hidden', !show && !missingArrowMode);
   field.innerHTML = show
-    ? `<div class="missing-arrow-actions"><span class="hint">화살표 위치 확인 후 저장</span><button type="button" class="success" onclick="confirmMissingArrow()">SAVE</button><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
+    ? `<div class="missing-arrow-actions"><span class="hint">Press Enter to save</span><button type="button" class="success" onclick="confirmMissingArrow()">SAVE</button><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
     : missingArrowMode
-      ? `<div class="missing-arrow-actions"><span class="hint">이미지 위에서 화살표를 그려주세요</span><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
+      ? `<div class="missing-arrow-actions"><span class="hint">Draw arrow on image</span><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
       : '<div id="actionClassChecks"></div>';
 }
 
-async function renderMissingIssueImage(record, arrow) {
+async function renderMissingIssueImage(record, arrows) {
   const canvas = document.createElement('canvas');
   await renderCanvas(canvas, record, 1200, true);
-  drawFeedbackShape(canvas.getContext('2d'), arrow, canvas.width, canvas.height, false);
+  arrows.forEach(arrow => drawFeedbackShape(canvas.getContext('2d'), arrow, canvas.width, canvas.height, false));
   return canvas.toDataURL('image/png');
 }
 
@@ -4600,7 +4610,7 @@ function saveIssueType(type) {
   if (type === 'missing') {
     missingArrowMode = true;
     missingArrowDraft = null;
-    missingArrowPending = null;
+    missingArrowPending = [];
     renderMissingArrowControls(false);
     hideIssuePopup();
     return;
@@ -4747,7 +4757,7 @@ function resetIssueDraft() {
   activeBoxIndex = -1;
   missingArrowMode = false;
   missingArrowDraft = null;
-  missingArrowPending = null;
+  missingArrowPending = [];
   document.querySelectorAll('#issueChecks input').forEach(input => input.checked = false);
   setSelectedActionClasses('');
   document.getElementById('noteInput').value = '';
@@ -4923,7 +4933,7 @@ function buildMissingRows() {
           rows.push([
             group.file || group.baseName || '',
             compactTargetLabel(issue),
-            issue.arrow ? JSON.stringify(issue.arrow) : '',
+            issue.arrows?.length ? JSON.stringify(issue.arrows) : issue.arrow ? JSON.stringify([issue.arrow]) : '',
             issue.imageData || ''
           ]);
         });
