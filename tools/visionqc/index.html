@@ -917,8 +917,8 @@
       justify-items: center;
     }
     .feedback-slide {
-      width: min(1120px, 100%);
-      aspect-ratio: 16 / 9;
+      width: min(1040px, 100%);
+      aspect-ratio: 4 / 3;
       background: #fff;
       border: 1px solid #cfd5df;
       box-shadow: 0 8px 28px rgba(16,24,40,.16);
@@ -928,9 +928,6 @@
       padding: 24px;
       break-after: page;
       page-break-after: always;
-    }
-    .feedback-tools {
-      display: none;
     }
     .feedback-sidebar {
       position: sticky;
@@ -971,22 +968,19 @@
       place-items: center;
       font-size: 10px;
     }
-    .feedback-tool-grid,
-    .feedback-color-grid {
+    .feedback-tool-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 7px;
     }
-    .feedback-tool-grid button,
-    .feedback-color-grid button {
+    .feedback-tool-grid button {
       min-height: 38px;
       padding: 0;
       display: grid;
       place-items: center;
       border-radius: 6px;
     }
-    .feedback-tool-grid button.active,
-    .feedback-color-grid button.active {
+    .feedback-tool-grid button.active {
       background: #eef2ff;
       border-color: #5570c9;
       color: #111827;
@@ -995,24 +989,6 @@
       width: 22px;
       height: 22px;
       display: block;
-    }
-    .color-dot {
-      width: 21px;
-      height: 21px;
-      border-radius: 50%;
-      display: block;
-      border: 2px solid rgba(255,255,255,.95);
-      box-shadow: 0 0 0 1px rgba(17,24,39,.16);
-    }
-    .feedback-action-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 7px;
-    }
-    .feedback-action-grid button {
-      min-height: 34px;
-      padding: 6px 8px;
-      font-size: 11px;
     }
     .feedback-save-status {
       color: var(--muted);
@@ -1071,6 +1047,7 @@
     }
     .feedback-canvas-wrap {
       min-height: 0;
+      aspect-ratio: 4 / 3;
       background: #151823;
       display: grid;
       place-items: center;
@@ -1897,18 +1874,7 @@
         </div>
       </div>
       <div class="feedback-step">
-        <div class="feedback-step-title"><span>3</span>COLOR</div>
-        <div class="feedback-color-grid" id="feedbackColors"></div>
-      </div>
-      <div class="feedback-step">
-        <div class="feedback-step-title"><span>4</span>FIX</div>
-        <div class="feedback-action-grid">
-          <button type="button" onclick="deleteFeedbackShape()">DELETE</button>
-          <button type="button" onclick="clearFeedbackShapes()">CLEAR</button>
-        </div>
-      </div>
-      <div class="feedback-step">
-        <div class="feedback-step-title"><span>5</span>SAVE</div>
+        <div class="feedback-step-title"><span>3</span>SAVE</div>
         <button type="button" onclick="saveFeedbackDraft()">SAVE DRAFT</button>
         <div class="feedback-save-status" id="feedbackSaveStatus">NOT SAVED</div>
       </div>
@@ -5321,10 +5287,13 @@ function feedbackRows() {
 
 let feedbackSlides = [];
 let feedbackTool = 'rect';
-let feedbackColor = '#ff2d55';
 let feedbackActive = null;
 let feedbackDraft = null;
-const FEEDBACK_COLORS = ['#ff2d55', '#2563eb', '#16a34a', '#f59e0b', '#111827'];
+const FEEDBACK_TOOL_COLORS = {
+  rect: '#ff2d55',
+  circle: '#2563eb',
+  arrow: '#16a34a'
+};
 
 function buildFeedbackSlides(rows) {
   const groups = new Map();
@@ -5360,42 +5329,13 @@ function setFeedbackTool(tool) {
   });
 }
 
-function setFeedbackColor(color) {
-  feedbackColor = color;
-  document.querySelectorAll('#feedbackColors [data-feedback-color]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.feedbackColor === color);
-  });
-  const activeShape = getActiveFeedbackShape();
-  if (activeShape) {
-    activeShape.color = color;
-    redrawActiveFeedbackCanvas();
-  }
-}
-
-function buildFeedbackColorButtons() {
-  const wrap = document.getElementById('feedbackColors');
-  if (!wrap || wrap.dataset.ready) return;
-  wrap.dataset.ready = '1';
-  FEEDBACK_COLORS.forEach(color => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.feedbackColor = color;
-    btn.title = color;
-    btn.innerHTML = `<span class="color-dot" style="background:${color}"></span>`;
-    btn.addEventListener('click', () => setFeedbackColor(color));
-    wrap.appendChild(btn);
-  });
-}
-
 async function openFeedbackDeck() {
   const rows = feedbackRows();
   const modal = document.getElementById('feedbackModal');
   const deck = document.getElementById('feedbackDeck');
   feedbackSlides = buildFeedbackSlides(rows);
   feedbackActive = null;
-  buildFeedbackColorButtons();
   setFeedbackTool(feedbackTool);
-  setFeedbackColor(feedbackColor);
   updateFeedbackSaveStatus('NOT SAVED');
   document.getElementById('feedbackCount').textContent = `${feedbackSlides.length} PAGES / ${rows.length} ISSUES`;
   deck.innerHTML = rows.length ? '' : '<div class="feedback-empty">NO ISSUE</div>';
@@ -5453,14 +5393,23 @@ async function redrawFeedbackCanvas(canvas) {
 }
 
 async function renderFeedbackCanvas(canvas, record, issue, shapes = [], activeShapeIndex = -1) {
-  const previousVisibleClasses = visibleClasses;
-  visibleClasses = new Set(classes);
-  record.boxes.forEach(box => visibleClasses.add(box.className));
-  await renderCanvas(canvas, record, 900, false);
-  visibleClasses = previousVisibleClasses;
+  canvas.width = 960;
+  canvas.height = 720;
   const ctx = canvas.getContext('2d');
   const img = await loadImage(record.imageFile);
-  drawFeedbackTarget(ctx, record, issue, canvas.width, canvas.height, img.naturalWidth, img.naturalHeight);
+  ctx.fillStyle = '#151823';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const scale = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+  const drawW = Math.round(img.naturalWidth * scale);
+  const drawH = Math.round(img.naturalHeight * scale);
+  const dx = Math.round((canvas.width - drawW) / 2);
+  const dy = Math.round((canvas.height - drawH) / 2);
+  ctx.drawImage(img, dx, dy, drawW, drawH);
+  ctx.save();
+  ctx.translate(dx, dy);
+  drawBoxes(ctx, record, drawW, drawH, img.naturalWidth, img.naturalHeight, false);
+  drawFeedbackTarget(ctx, record, issue, drawW, drawH, img.naturalWidth, img.naturalHeight);
+  ctx.restore();
   shapes.forEach((shape, index) => drawFeedbackShape(ctx, shape, canvas.width, canvas.height, index === activeShapeIndex));
 }
 
@@ -5509,8 +5458,9 @@ function drawFeedbackShape(ctx, shape, canvasW, canvasH, active = false) {
   const x2 = shape.x2 * canvasW;
   const y2 = shape.y2 * canvasH;
   ctx.save();
-  ctx.strokeStyle = active ? '#111827' : (shape.color || feedbackColor);
-  ctx.fillStyle = active ? '#111827' : (shape.color || feedbackColor);
+  const color = shape.color || FEEDBACK_TOOL_COLORS[shape.type] || '#ff2d55';
+  ctx.strokeStyle = active ? '#111827' : color;
+  ctx.fillStyle = active ? '#111827' : color;
   ctx.lineWidth = active ? 5 : 4;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -5535,6 +5485,46 @@ function drawFeedbackShape(ctx, shape, canvasW, canvasH, active = false) {
     ctx.fill();
   }
   ctx.restore();
+  drawFeedbackDeleteHandle(ctx, shape, canvasW, canvasH);
+}
+
+function drawFeedbackDeleteHandle(ctx, shape, canvasW, canvasH) {
+  const handle = feedbackShapeDeleteHandle(shape, canvasW, canvasH);
+  ctx.save();
+  ctx.fillStyle = '#111827';
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(handle.x, handle.y, handle.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(handle.x - 4, handle.y - 4);
+  ctx.lineTo(handle.x + 4, handle.y + 4);
+  ctx.moveTo(handle.x + 4, handle.y - 4);
+  ctx.lineTo(handle.x - 4, handle.y + 4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function feedbackShapeDeleteHandle(shape, canvasW, canvasH) {
+  const x1 = shape.x1 * canvasW;
+  const y1 = shape.y1 * canvasH;
+  const x2 = shape.x2 * canvasW;
+  const y2 = shape.y2 * canvasH;
+  return { x: Math.max(12, Math.min(canvasW - 12, Math.max(x1, x2))), y: Math.max(12, Math.min(canvasH - 12, Math.min(y1, y2))), r: 10 };
+}
+
+function feedbackShapeAtPoint(item, point, canvas) {
+  for (let i = item.shapes.length - 1; i >= 0; i--) {
+    const handle = feedbackShapeDeleteHandle(item.shapes[i], canvas.width, canvas.height);
+    const x = point.x * canvas.width;
+    const y = point.y * canvas.height;
+    if (Math.hypot(x - handle.x, y - handle.y) <= handle.r + 4) return { index: i, deleteHandle: true };
+  }
+  return null;
 }
 
 function canvasPoint(event, canvas) {
@@ -5550,14 +5540,20 @@ function attachFeedbackCanvasEvents(canvas) {
     const { slideIndex, itemIndex, item } = feedbackCanvasItem(canvas);
     if (!item) return;
     const point = canvasPoint(event, canvas);
-    if (feedbackTool === 'select') {
-      feedbackActive = { slideIndex, itemIndex, shapeIndex: Math.max(0, item.shapes.length - 1) };
-      const activeShape = getActiveFeedbackShape();
-      if (activeShape?.color) setFeedbackColor(activeShape.color);
+    const hit = feedbackShapeAtPoint(item, point, canvas);
+    if (hit?.deleteHandle) {
+      item.shapes.splice(hit.index, 1);
+      feedbackActive = null;
+      updateFeedbackSaveStatus('UNSAVED CHANGES');
       redrawFeedbackCanvas(canvas);
       return;
     }
-    feedbackDraft = { canvas, slideIndex, itemIndex, shape: { type: feedbackTool, color: feedbackColor, x1: point.x, y1: point.y, x2: point.x, y2: point.y } };
+    if (feedbackTool === 'select') {
+      feedbackActive = hit ? { slideIndex, itemIndex, shapeIndex: hit.index } : null;
+      redrawFeedbackCanvas(canvas);
+      return;
+    }
+    feedbackDraft = { canvas, slideIndex, itemIndex, shape: { type: feedbackTool, color: FEEDBACK_TOOL_COLORS[feedbackTool] || '#ff2d55', x1: point.x, y1: point.y, x2: point.x, y2: point.y } };
     canvas.setPointerCapture(event.pointerId);
   });
   canvas.addEventListener('pointermove', event => {
