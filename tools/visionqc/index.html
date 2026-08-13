@@ -1001,8 +1001,9 @@
     }
     .feedback-slide.editor {
       grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: auto minmax(0, 1fr) auto;
       gap: 12px;
+      overflow: hidden;
     }
     .feedback-slide-heading {
       display: flex;
@@ -1030,9 +1031,10 @@
       min-width: 0;
       min-height: 0;
       border: 1px solid #cfd5df;
-      display: grid;
-      grid-template-rows: auto 1fr auto;
+      display: flex;
+      flex-direction: column;
       background: #fafafa;
+      overflow: hidden;
     }
     .feedback-item-meta {
       padding: 7px 9px;
@@ -1047,6 +1049,7 @@
     }
     .feedback-canvas-wrap {
       min-height: 0;
+      flex: 1 1 auto;
       aspect-ratio: 4 / 3;
       background: #151823;
       display: grid;
@@ -3937,48 +3940,10 @@ function drawShapePath(ctx, shape, imgW, imgH, scaleX, scaleY) {
 }
 
 function drawClassBoxes(ctx, record, className, canvasW, canvasH, imgW, imgH) {
-  ctx.save();
-  const scaleX = canvasW / imgW;
-  const scaleY = canvasH / imgH;
-  record.boxes.forEach((box) => {
-    if (box.className !== className) return;
-    const color = classColors[box.className] || '#ffcf4a';
-    const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
-    ctx.globalAlpha = 0.18;
-    ctx.fillStyle = color;
-    drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
-    if (box.type === 'polygon') ctx.fill();
-    else if (box.type === 'keypoint') {
-      ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(4, canvasW / 180), 0, Math.PI * 2);
-      ctx.fill();
-    }
-    else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-    ctx.globalAlpha = 1;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 14;
-    const baseLineWidth = classLineWidths[box.className] || 2;
-    ctx.lineWidth = Math.min(5, baseLineWidth + 2);
-    ctx.strokeStyle = '#ffffff';
-    drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
-    if (box.type === 'polygon') ctx.stroke();
-    else if (box.type === 'keypoint') {
-      ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(6, canvasW / 140), 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = baseLineWidth;
-    ctx.strokeStyle = color;
-    if (box.type === 'polygon') {
-      drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
-      ctx.stroke();
-    } else {
-      ctx.strokeRect(rect.x - 3, rect.y - 3, rect.w + 6, rect.h + 6);
-    }
-  });
-  ctx.restore();
+  const previousVisibleClasses = visibleClasses;
+  visibleClasses = new Set([className]);
+  drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, false);
+  visibleClasses = previousVisibleClasses;
 }
 
 function consistencySourceRows() {
@@ -4903,7 +4868,7 @@ function buildMissingSheet() {
             group.file || group.baseName || '',
             compactTargetLabel(issue),
             arrows.length,
-            issue.imageData ? 'image' : ''
+            ''
           ]);
           if (issue.imageData) images.push({ row: rowIndex, col: 3, data: dataUrlBytes(issue.imageData), width: 128, height: 82 });
         });
@@ -4921,7 +4886,7 @@ async function buildConsisSheet() {
     if (!record) continue;
     for (const issue of (group.issues || []).filter(issue => (issue.types || []).includes('consis'))) {
       const rowIndex = rows.length;
-      rows.push([group.file || group.baseName || '', compactTargetLabel(issue), issue.note || '', 'image']);
+      rows.push([group.file || group.baseName || '', compactTargetLabel(issue), issue.note || '', '']);
       const imageData = await renderConsisIssueImage(record, issue);
       images.push({ row: rowIndex, col: 3, data: dataUrlBytes(imageData), width: 128, height: 82 });
     }
@@ -4999,11 +4964,7 @@ function buildSheetXml(rows, hasDrawing = false) {
 }
 
 function encodeXml(xml) {
-  const bytes = new TextEncoder().encode(xml);
-  const out = new Uint8Array(bytes.length + 3);
-  out.set([0xEF, 0xBB, 0xBF], 0);
-  out.set(bytes, 3);
-  return out;
+  return new TextEncoder().encode(xml);
 }
 
 function buildWorkbookXml(sheetNames) {
@@ -5329,12 +5290,21 @@ function setFeedbackTool(tool) {
   });
 }
 
+function initFeedbackTools() {
+  document.querySelectorAll('#feedbackTools [data-feedback-tool]').forEach(btn => {
+    if (btn.dataset.ready) return;
+    btn.dataset.ready = '1';
+    btn.addEventListener('click', () => setFeedbackTool(btn.dataset.feedbackTool));
+  });
+}
+
 async function openFeedbackDeck() {
   const rows = feedbackRows();
   const modal = document.getElementById('feedbackModal');
   const deck = document.getElementById('feedbackDeck');
   feedbackSlides = buildFeedbackSlides(rows);
   feedbackActive = null;
+  initFeedbackTools();
   setFeedbackTool(feedbackTool);
   updateFeedbackSaveStatus('NOT SAVED');
   document.getElementById('feedbackCount').textContent = `${feedbackSlides.length} PAGES / ${rows.length} ISSUES`;
