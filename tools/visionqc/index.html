@@ -444,6 +444,7 @@
       max-height: 52vh;
       display: grid;
       place-items: safe center;
+      position: relative;
     }
     #mainCanvas {
       max-width: 100%;
@@ -451,41 +452,74 @@
       display: block;
       cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 15 15'%3E%3Crect x='0.5' y='0.5' width='14' height='14' fill='none' stroke='%23000000' stroke-width='1'/%3E%3Crect x='1.5' y='1.5' width='12' height='12' fill='none' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E") 7 7, crosshair;
     }
-    .nav-arrow {
+    .canvas-bezel {
       position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 40px;
-      height: 40px;
-      min-height: 0;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,.25);
-      background: rgba(var(--dark-rgb),.55);
-      color: #fff;
-      font-size: 20px;
-      font-weight: 900;
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      z-index: 3;
-    }
-    .nav-arrow:hover { background: rgba(107,132,220,.85); }
-    .nav-arrow:disabled { opacity: .25; cursor: not-allowed; background: rgba(var(--dark-rgb),.55); }
-    .nav-prev { left: 10px; }
-    .nav-next { right: 10px; }
-    .pos-counter {
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(255,255,255,.32);
+      background: rgba(var(--dark-rgb),.72);
+      color: #ffffff;
+      padding: 5px 8px;
       font-size: 12px;
-      color: var(--muted);
-      font-weight: 800;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .bezel-nav {
+      width: 24px;
+      height: 24px;
+      min-height: 0;
+      padding: 0;
+      border-radius: 0;
+      border: 1px solid rgba(255,255,255,.28);
+      background: rgba(255,255,255,.08);
+      color: #ffffff;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .bezel-nav:hover { background: rgba(107,132,220,.85); }
+    .bezel-nav:disabled { opacity: .25; cursor: not-allowed; }
+    .pos-counter {
+      color: inherit;
       white-space: nowrap;
     }
     #mainViewToggleBtn.active { background: #e1e6fa; color: #5570c9; border-color: var(--accent); }
     #mainCanvas.select-mode { cursor: pointer; }
-    #magnifierModeBtn.active,
-    #objectSelectModeBtn.active {
+    .tool-switch {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--soft);
+    }
+    .tool-switch button {
+      min-height: 28px;
+      width: 34px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 16px;
+      display: grid;
+      place-items: center;
+    }
+    .tool-switch svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .tool-switch button.active {
       background: #e1e6fa;
       color: #5570c9;
-      border-color: var(--accent);
     }
 
     .magnifier {
@@ -656,27 +690,18 @@
     .issue-form { display: grid; gap: 10px; }
     .issue-columns {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
+      grid-template-columns: 1fr;
+      gap: 6px;
     }
     .issue-column {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 8px;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
       display: grid;
-      gap: 7px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
       align-content: start;
-      background: #fff;
     }
-    .issue-column-title {
-      font-size: 11px;
-      font-weight: 900;
-      color: var(--muted);
-      letter-spacing: 0;
-      text-transform: uppercase;
-    }
-    .issue-column .check-grid { grid-template-columns: 1fr; }
-    .issue-column .hint { font-size: 11px; }
     .check-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -691,7 +716,7 @@
       align-items: center;
       gap: 6px;
       cursor: pointer;
-      background: white;
+      background: var(--soft);
     }
     .check:has(input:checked) {
       border-color: #eec4d0;
@@ -710,7 +735,7 @@
       border: 1px solid var(--line);
       border-radius: 6px;
       padding: 8px;
-      background: #fff;
+      background: var(--soft);
     }
     .box-details summary {
       cursor: pointer;
@@ -1660,21 +1685,29 @@
       <div class="panel-head">
         <div class="panel-title">REVIEW</div>
         <div class="btn-row">
-          <span class="pos-counter" id="posCounter"></span>
-          <button id="magnifierModeBtn" onclick="setReviewToolMode('magnifier')" title="MAGNIFIER">MAG</button>
-          <button id="objectSelectModeBtn" onclick="setReviewToolMode('select')" title="OBJECT SELECT">SELECT</button>
+          <div class="tool-switch" role="group" aria-label="REVIEW TOOL">
+            <button id="magnifierModeBtn" onclick="setReviewToolMode('magnifier')" title="MAGNIFIER" aria-label="MAGNIFIER">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.5 15.5 21 21"></path></svg>
+            </button>
+            <button id="objectSelectModeBtn" onclick="setReviewToolMode('select')" title="OBJECT SELECT" aria-label="OBJECT SELECT">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3 19 12 12 14 9 21 5 3Z"></path></svg>
+            </button>
+          </div>
           <button id="mainViewToggleBtn" onclick="toggleMainViewMode()" title="VIEW">IMAGE</button>
-          <button onclick="prevItem()" title="PREV">PREV</button>
-          <button onclick="nextItem()" title="NEXT">NEXT</button>
           <button id="fullscreenToggleBtn" onclick="toggleReviewMode()" title="FOCUS">FOCUS</button>
         </div>
       </div>
       <div class="panel-body viewer">
         <div class="viewer-main">
           <div class="canvas-frame" id="canvasFrame">
-            <button class="nav-arrow nav-prev" id="navPrevBtn" onclick="prevItem()" title="PREV">‹</button>
+            <div class="canvas-bezel">
+              <span>(d)</span>
+              <button class="bezel-nav" id="navPrevBtn" onclick="prevItem()" title="PREV">&lt;</button>
+              <span class="pos-counter" id="posCounter"></span>
+              <button class="bezel-nav" id="navNextBtn" onclick="nextItem()" title="NEXT">&gt;</button>
+              <span>(f)</span>
+            </div>
             <canvas id="mainCanvas"></canvas>
-            <button class="nav-arrow nav-next" id="navNextBtn" onclick="nextItem()" title="NEXT">›</button>
             <div class="magnifier hidden" id="magnifier"><canvas id="magnifierCanvas"></canvas></div>
           </div>
         </div>
@@ -1694,9 +1727,7 @@
               <label>ISSUE</label>
               <div class="issue-columns" id="issueChecks"></div>
               <div class="issue-inline-select hidden" id="missingClassField">
-                <label>ACTION CLASS</label>
-                <div class="check-grid" id="actionClassChecks"></div>
-                <div class="hint">Select an object first for DELETE. For MISSING, save it on the image or add the class/location memo in Comment.</div>
+                <div id="actionClassChecks"></div>
               </div>
             </div>
             <div class="field hidden" id="commentField">
@@ -1707,7 +1738,6 @@
               <button class="danger" onclick="clearCurrentIssue()">CLEAR</button>
               <button class="success" onclick="markOk()">SAVE</button>
             </div>
-            <div class="hint">KEY: D / F / H</div>
           </div>
 
           <div class="field">
@@ -4220,21 +4250,16 @@ function buildIssueChecks() {
   const wrap = document.getElementById('issueChecks');
   wrap.innerHTML = `
     <div class="issue-column">
-      <div class="issue-column-title">Class mismatch & Size</div>
       ${issueCheckHtml('wrong_class', 'Class mismatch')}
       ${issueCheckHtml('wrong_box', 'Size')}
     </div>
     <div class="issue-column">
-      <div class="issue-column-title">Missing & Delete</div>
       ${issueCheckHtml('missing', 'Missing')}
       ${issueCheckHtml('unnecessary', 'Delete')}
-      <div class="hint">Use object select for DELETE. Use Comment for MISSING location.</div>
     </div>
     <div class="issue-column">
-      <div class="issue-column-title">Consis & Comment</div>
       ${issueCheckHtml('consis', 'Consis')}
       <button type="button" id="commentToggleBtn" onclick="toggleCommentField(true)">COMMENT</button>
-      <div class="hint">Use Consis for guide-board review. Use Comment for detailed notes.</div>
     </div>
   `;
 }
@@ -4256,8 +4281,7 @@ function toggleCommentField(show) {
 }
 
 function updateMissingClassVisibility() {
-  const needsClass = Array.from(document.querySelectorAll('#issueChecks input:checked')).some(input => input.value === 'missing' || input.value === 'unnecessary');
-  document.getElementById('missingClassField').classList.toggle('hidden', !needsClass);
+  document.getElementById('missingClassField').classList.add('hidden');
 }
 
 function loadIssueToForm() {
