@@ -1,9 +1,6 @@
 const qcToolButton = document.querySelector("#qcToolButton");
 const introModal = document.querySelector("#introModal");
 const closeIntroButton = document.querySelector("#closeIntroButton");
-const emailModal = document.querySelector("#emailModal");
-const emailForm = document.querySelector("#emailForm");
-const closeEmailButton = document.querySelector("#closeEmailButton");
 const authStatus = document.querySelector("#authStatus");
 const workspace = document.querySelector("#workspace");
 const workspaceText = document.querySelector("#workspaceText");
@@ -14,7 +11,7 @@ const dots = Array.from(document.querySelectorAll(".dot"));
 const slides = [
   "이미지와 라벨 파일을 업로드하고, 클래스와 박스 오류를 한 화면에서 확인합니다.",
   "검수 기준에 맞지 않는 박스와 누락 가능성이 있는 데이터를 빠르게 찾습니다.",
-  "이메일 확인 후 검수 작업을 시작할 수 있습니다."
+  "바로 Vision QC 화면으로 이동해 검수 작업을 시작할 수 있습니다."
 ];
 
 let slideIndex = 0;
@@ -38,14 +35,8 @@ function updateSlide() {
   });
 }
 
-function showEmailGate() {
-  emailModal.classList.remove("hidden");
-  const emailInput = emailForm.querySelector("input[type='email']");
-  emailInput.focus();
-}
-
 function activateTool() {
-  authStatus.textContent = "이메일 확인 완료";
+  authStatus.textContent = "바로 사용 가능";
   authStatus.classList.add("ready");
   workspace.classList.remove("locked");
   workspaceText.textContent = "검수 툴로 이동합니다.";
@@ -53,51 +44,11 @@ function activateTool() {
   window.location.href = "./visionqc/";
 }
 
-async function logEmail(email) {
-  const response = await fetch("/api/email-log", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json"
-    },
-    body: JSON.stringify({
-      email,
-      tool: "bbox-qc",
-      page: window.location.pathname
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error("Email log request failed");
-  }
-}
-
 qcToolButton.addEventListener("click", showIntro);
 
 closeIntroButton.addEventListener("click", () => {
   clearInterval(carouselTimer);
   introModal.classList.add("hidden");
-  showEmailGate();
-});
-
-closeEmailButton.addEventListener("click", () => {
-  emailModal.classList.add("hidden");
-});
-
-emailForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const emailInput = emailForm.querySelector("input[type='email']");
-  if (!emailInput.checkValidity()) {
-    emailInput.reportValidity();
-    return;
-  }
-  try {
-    const email = emailInput.value.trim();
-    sessionStorage.setItem("fromliloUserEmail", email);
-    await logEmail(email);
-  } catch (error) {
-    console.warn(error);
-  }
-  emailModal.classList.add("hidden");
   activateTool();
 });
 
