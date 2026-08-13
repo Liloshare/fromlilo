@@ -4921,8 +4921,9 @@ function buildIssueMatrixRows() {
   return rows;
 }
 
-function buildMissingRows() {
-  const rows = [['file', 'target', 'arrow', 'image_png_data_url']];
+function buildMissingSheet() {
+  const rows = [['file', 'target', 'arrow_count', 'image']];
+  const images = [];
   const scopedIds = new Set(scopedRecords().map(record => record.id));
   Array.from(issueMap.values())
     .filter(group => scopedIds.has(group.id))
@@ -4930,15 +4931,56 @@ function buildMissingRows() {
       (group.issues || [])
         .filter(issue => (issue.types || []).includes('missing'))
         .forEach(issue => {
+          const rowIndex = rows.length;
+          const arrows = issue.arrows || (issue.arrow ? [issue.arrow] : []);
           rows.push([
             group.file || group.baseName || '',
             compactTargetLabel(issue),
-            issue.arrows?.length ? JSON.stringify(issue.arrows) : issue.arrow ? JSON.stringify([issue.arrow]) : '',
-            issue.imageData || ''
+            arrows.length,
+            issue.imageData ? 'image' : ''
           ]);
+          if (issue.imageData) images.push({ row: rowIndex, col: 3, data: dataUrlBytes(issue.imageData), width: 128, height: 82 });
         });
     });
-  return rows;
+  return { name: 'missing', rows, images };
+}
+
+async function buildConsisSheet() {
+  const rows = [['file', 'target', 'comment', 'image']];
+  const images = [];
+  const scoped = scopedRecords();
+  const scopedIds = new Set(scoped.map(record => record.id));
+  for (const group of Array.from(issueMap.values()).filter(group => scopedIds.has(group.id))) {
+    const record = records.find(record => record.id === group.id);
+    if (!record) continue;
+    for (const issue of (group.issues || []).filter(issue => (issue.types || []).includes('consis'))) {
+      const rowIndex = rows.length;
+      rows.push([group.file || group.baseName || '', compactTargetLabel(issue), issue.note || '', 'image']);
+      const imageData = await renderConsisIssueImage(record, issue);
+      images.push({ row: rowIndex, col: 3, data: dataUrlBytes(imageData), width: 128, height: 82 });
+    }
+  }
+  return { name: 'consis', rows, images };
+}
+
+async function renderConsisIssueImage(record, issue) {
+  const canvas = document.createElement('canvas');
+  await renderFeedbackCanvas(canvas, record, issue, [], -1);
+  return canvas.toDataURL('image/png');
+}
+
+function buildSummaryRows() {
+  const scoped = scopedRecords();
+  const viewed = scoped.filter(record => reviewedSet.has(record.id) || issueMap.has(record.id)).length;
+  const issueCount = Array.from(issueMap.values()).filter(group => (group.issues || []).length > 0).length;
+  const totalIssues = Array.from(issueMap.values()).reduce((sum, group) => sum + (group.issues || []).length, 0);
+  return [
+    ['metric', 'value'],
+    ['loaded_images', scoped.filter(record => record.imageFile).length],
+    ['single_page_viewed', viewed],
+    ['error_images', issueCount],
+    ['total_issues', totalIssues]
+  ];
 }
 
 // Only images that actually carry label data are worth a row in the QC
@@ -4972,7 +5014,7 @@ function xmlEscape(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[ch]));
 }
 
-function buildSheetXml(rows) {
+function buildSheetXml(rows, hasDrawing = false) {
   const rowsXml = rows.map((row, ri) => {
     const cells = row.map((val, ci) => {
       const ref = xlsxColumnName(ci) + (ri + 1);
@@ -4981,9 +5023,13 @@ function buildSheetXml(rows) {
       }
       return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${xmlEscape(val)}</t></is></c>`;
     }).join('');
-    return `<row r="${ri + 1}">${cells}</row>`;
+    const height = ri > 0 && hasDrawing ? ' ht="92" customHeight="1"' : '';
+    return `<row r="${ri + 1}"${height}>${cells}</row>`;
   }).join('');
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rowsXml}</sheetData></worksheet>`;
+  const cols = hasDrawing ? '<cols><col min="1" max="1" width="32" customWidth="1"/><col min="2" max="4" width="18" customWidth="1"/></cols>' : '';
+  const drawing = hasDrawing ? '<drawing r:id="rId1"/>' : '';
+  const relNs = hasDrawing ? ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' : '';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"${relNs}>${cols}<sheetData>${rowsXml}</sheetData>${drawing}</worksheet>`;
 }
 
 function encodeXml(xml) {
@@ -5004,9 +5050,11 @@ function buildWorkbookRelsXml(sheetNames) {
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels}</Relationships>`;
 }
 
-function buildContentTypesXml(sheetNames) {
+function buildContentTypesXml(sheetNames, drawingCount = 0, hasPng = false) {
   const overrides = sheetNames.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('');
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${overrides}</Types>`;
+  const drawingOverrides = Array.from({ length: drawingCount }, (_, i) => `<Override PartName="/xl/drawings/drawing${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`).join('');
+  const pngDefault = hasPng ? '<Default Extension="png" ContentType="image/png"/>' : '';
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>${pngDefault}<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${overrides}${drawingOverrides}</Types>`;
 }
 
 const XLSX_ROOT_RELS_XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
@@ -5097,15 +5145,61 @@ function buildZip(files) {
   return new Blob([...localParts, ...centralParts, end], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
 
-// sheets: [{ name, rows: [[cell, ...], ...] }]
+function buildWorksheetRelsXml(drawingIndex) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing${drawingIndex}.xml"/></Relationships>`;
+}
+
+function buildDrawingRelsXml(images) {
+  const rels = images.map((image, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/${image.mediaName}"/>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels}</Relationships>`;
+}
+
+function buildDrawingXml(images) {
+  const emu = 9525;
+  const anchors = images.map((image, i) => {
+    const width = Math.round((image.width || 120) * emu);
+    const height = Math.round((image.height || 80) * emu);
+    const row = Math.max(0, image.row || 0);
+    const col = Math.max(0, image.col || 0);
+    return `<xdr:oneCellAnchor><xdr:from><xdr:col>${col}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${row}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="${width}" cy="${height}"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="${i + 1}" name="Image ${i + 1}"/><xdr:cNvPicPr/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId${i + 1}"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>`;
+  }).join('');
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${anchors}</xdr:wsDr>`;
+}
+
+// sheets: [{ name, rows: [[cell, ...], ...], images?: [{ row, col, data, width, height }] }]
 function downloadXlsx(sheets, filename) {
   const sheetNames = sheets.map(s => s.name);
+  let drawingIndex = 0;
+  let mediaIndex = 0;
+  const drawingFiles = [];
+  const sheetRelFiles = [];
+  const mediaFiles = [];
+  const normalizedSheets = sheets.map((sheet, sheetIndex) => {
+    const images = (sheet.images || []).filter(image => image.data?.length);
+    if (!images.length) return { ...sheet, images: [] };
+    drawingIndex++;
+    const drawingImages = images.map(image => {
+      mediaIndex++;
+      const mediaName = `image${mediaIndex}.png`;
+      mediaFiles.push({ name: `xl/media/${mediaName}`, data: image.data });
+      return { ...image, mediaName };
+    });
+    sheetRelFiles.push({ name: `xl/worksheets/_rels/sheet${sheetIndex + 1}.xml.rels`, data: encodeXml(buildWorksheetRelsXml(drawingIndex)) });
+    drawingFiles.push(
+      { name: `xl/drawings/drawing${drawingIndex}.xml`, data: encodeXml(buildDrawingXml(drawingImages)) },
+      { name: `xl/drawings/_rels/drawing${drawingIndex}.xml.rels`, data: encodeXml(buildDrawingRelsXml(drawingImages)) }
+    );
+    return { ...sheet, images: drawingImages, drawingIndex };
+  });
   const files = [
-    { name: '[Content_Types].xml', data: encodeXml(buildContentTypesXml(sheetNames)) },
+    { name: '[Content_Types].xml', data: encodeXml(buildContentTypesXml(sheetNames, drawingIndex, mediaFiles.length > 0)) },
     { name: '_rels/.rels', data: encodeXml(XLSX_ROOT_RELS_XML) },
     { name: 'xl/workbook.xml', data: encodeXml(buildWorkbookXml(sheetNames)) },
     { name: 'xl/_rels/workbook.xml.rels', data: encodeXml(buildWorkbookRelsXml(sheetNames)) },
-    ...sheets.map((s, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: encodeXml(buildSheetXml(s.rows)) }))
+    ...normalizedSheets.map((s, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: encodeXml(buildSheetXml(s.rows, s.images.length > 0)) })),
+    ...sheetRelFiles,
+    ...drawingFiles,
+    ...mediaFiles
   ];
   const blob = buildZip(files);
   const url = URL.createObjectURL(blob);
@@ -5116,12 +5210,15 @@ function downloadXlsx(sheets, filename) {
   URL.revokeObjectURL(url);
 }
 
-function exportCsv() {
+async function exportCsv() {
   const issueMatrixRows = buildIssueMatrixRows();
-  const missingRows = buildMissingRows();
+  const missingSheet = buildMissingSheet();
+  const consisSheet = await buildConsisSheet();
   downloadXlsx([
     { name: 'issue_check', rows: issueMatrixRows },
-    { name: 'missing', rows: missingRows }
+    missingSheet,
+    consisSheet,
+    { name: 'summary', rows: buildSummaryRows() }
   ], 'bbox_qc_result.xlsx');
 }
 
