@@ -858,6 +858,12 @@
       border: 1px solid var(--line);
       background: var(--soft);
     }
+    .missing-arrow-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .missing-arrow-actions .hint { flex: 1 1 auto; }
 
     .feedback-modal {
       position: fixed;
@@ -2004,6 +2010,7 @@ let issueTarget = null;
 let selectedBoxIndices = new Set();
 let missingArrowMode = false;
 let missingArrowDraft = null;
+let missingArrowPending = null;
 
 // review-mode ("하나씩 넘기기") navigation queue, snapshot of the filtered list at the
 // moment review mode was entered so marking a record OK/issue doesn't yank it out from
@@ -3824,6 +3831,8 @@ async function renderCanvas(canvas, record, maxWidth, isMain = false) {
   if (!isMain || mainViewMode === 'overlay') {
     drawBoxes(ctx, record, w, h, img.naturalWidth, img.naturalHeight, isMain);
   }
+  if (isMain) drawSavedMissingArrows(ctx, record, w, h);
+  if (isMain && missingArrowPending) drawFeedbackShape(ctx, missingArrowPending, w, h, true);
 }
 
 function toggleMainViewMode() {
@@ -3921,6 +3930,13 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     }
   });
   ctx.restore();
+}
+
+function drawSavedMissingArrows(ctx, record, canvasW, canvasH) {
+  const issues = getRecordIssue(record)?.issues || [];
+  issues
+    .filter(issue => (issue.types || []).includes('missing') && issue.arrow)
+    .forEach(issue => drawFeedbackShape(ctx, issue.arrow, canvasW, canvasH, false));
 }
 
 function shapeRect(shape, imgW, imgH, scaleX, scaleY) {
@@ -4285,10 +4301,10 @@ async function finishMissingArrow(e) {
   const point = canvasPoint(e, canvas);
   missingArrowDraft.x2 = point.x;
   missingArrowDraft.y2 = point.y;
-  const arrow = { ...missingArrowDraft };
-  missingArrowMode = false;
+  missingArrowPending = { ...missingArrowDraft };
   missingArrowDraft = null;
-  await saveMissingArrowIssue(arrow);
+  renderMissingArrowControls(true);
+  await renderCurrent();
 }
 
 async function saveMissingArrowIssue(arrow) {
@@ -4312,6 +4328,35 @@ async function saveMissingArrowIssue(arrow) {
   updateGalleryHighlights();
   resetIssueDraft();
   renderCurrent();
+}
+
+async function confirmMissingArrow() {
+  if (!missingArrowPending) return;
+  const arrow = { ...missingArrowPending };
+  missingArrowMode = false;
+  missingArrowPending = null;
+  renderMissingArrowControls(false);
+  await saveMissingArrowIssue(arrow);
+}
+
+function cancelMissingArrow() {
+  missingArrowMode = false;
+  missingArrowDraft = null;
+  missingArrowPending = null;
+  renderMissingArrowControls(false);
+  renderCurrent();
+}
+
+function renderMissingArrowControls(show) {
+  const field = document.getElementById('missingClassField');
+  document.getElementById('missingIssueBtn')?.classList.toggle('active', show || missingArrowMode);
+  if (!field) return;
+  field.classList.toggle('hidden', !show && !missingArrowMode);
+  field.innerHTML = show
+    ? `<div class="missing-arrow-actions"><span class="hint">화살표 위치 확인 후 저장</span><button type="button" class="success" onclick="confirmMissingArrow()">SAVE</button><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
+    : missingArrowMode
+      ? `<div class="missing-arrow-actions"><span class="hint">이미지 위에서 화살표를 그려주세요</span><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
+      : '<div id="actionClassChecks"></div>';
 }
 
 async function renderMissingIssueImage(record, arrow) {
@@ -4492,7 +4537,8 @@ function buildIssueChecks() {
 buildIssueChecks();
 
 function issueButtonHtml(value, label, shortcut) {
-  return `<button type="button" class="check" onclick="saveIssueType('${value}')"><span class="issue-num">${shortcut}</span> ${label}</button>`;
+  const id = value === 'missing' ? ' id="missingIssueBtn"' : '';
+  return `<button type="button" class="check"${id} onclick="saveIssueType('${value}')"><span class="issue-num">${shortcut}</span> ${label}</button>`;
 }
 
 function handleIssueDraftChange(input) {
@@ -4554,6 +4600,8 @@ function saveIssueType(type) {
   if (type === 'missing') {
     missingArrowMode = true;
     missingArrowDraft = null;
+    missingArrowPending = null;
+    renderMissingArrowControls(false);
     hideIssuePopup();
     return;
   }
@@ -4697,10 +4745,14 @@ function resetIssueDraft() {
   issueTarget = null;
   selectedBoxIndices.clear();
   activeBoxIndex = -1;
+  missingArrowMode = false;
+  missingArrowDraft = null;
+  missingArrowPending = null;
   document.querySelectorAll('#issueChecks input').forEach(input => input.checked = false);
   setSelectedActionClasses('');
   document.getElementById('noteInput').value = '';
   toggleCommentField(false);
+  renderMissingArrowControls(false);
   updateMissingClassVisibility();
 }
 
