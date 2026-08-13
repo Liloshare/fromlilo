@@ -718,12 +718,49 @@
       cursor: pointer;
       background: var(--soft);
     }
+    button.check {
+      width: 100%;
+      min-height: 0;
+      color: inherit;
+      justify-content: flex-start;
+    }
+    .issue-num {
+      width: 16px;
+      height: 16px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
+      font-size: 10px;
+      font-weight: 900;
+      background: rgba(255,255,255,.45);
+      flex: 0 0 auto;
+    }
     .check:has(input:checked) {
       border-color: #eec4d0;
       background: #fbeef1;
       color: #a94d68;
       font-weight: 800;
     }
+    button.check.active {
+      border-color: #eec4d0;
+      background: #fbeef1;
+      color: #a94d68;
+      font-weight: 800;
+    }
+
+    .issue-popover {
+      position: absolute;
+      z-index: 8;
+      width: min(280px, calc(100% - 24px));
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 12px 30px rgba(0,0,0,.22);
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+    }
+    .issue-popover .issue-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
     .box-list {
       display: grid;
@@ -773,6 +810,19 @@
       max-height: 180px;
       overflow: auto;
     }
+    .issue-log-field {
+      position: fixed;
+      left: 50%;
+      bottom: 14px;
+      transform: translateX(-50%);
+      width: min(560px, calc(100vw - 28px));
+      z-index: 210;
+      background: rgba(245,244,241,.96);
+      border: 1px solid var(--line);
+      padding: 8px;
+      box-shadow: 0 10px 28px rgba(0,0,0,.12);
+    }
+    .issue-log-field .issues-list { max-height: 150px; }
     .issue-row {
       border: 1px solid #eec4d0;
       background: #fbf2f4;
@@ -1709,6 +1759,7 @@
             </div>
             <canvas id="mainCanvas"></canvas>
             <div class="magnifier hidden" id="magnifier"><canvas id="magnifierCanvas"></canvas></div>
+            <div class="issue-popover hidden" id="issuePopover"></div>
           </div>
         </div>
 
@@ -1735,12 +1786,11 @@
               <textarea id="noteInput" placeholder="COMMENT"></textarea>
             </div>
             <div class="btn-row">
-              <button class="danger" onclick="clearCurrentIssue()">CLEAR</button>
               <button class="success" onclick="markOk()">SAVE</button>
             </div>
           </div>
 
-          <div class="field">
+          <div class="field issue-log-field">
             <label>ISSUE LOG</label>
             <div class="issues-list" id="issuesList"></div>
           </div>
@@ -1940,7 +1990,7 @@ let visibleClasses = new Set();
 let classFilter = '__all__'; // '__all__' or a single class name — which images the gallery shows
 let reviewableTotal = 0; // count of matched+has-boxes records, for the stable #order badge
 let mainViewMode = 'overlay'; // 'overlay' | 'image' — single-image review canvas only
-let reviewToolMode = 'magnifier'; // 'magnifier' | 'select'
+let reviewToolMode = 'select'; // 'magnifier' | 'select'
 let magnifierImg = null; // full-res <img> for the currently selected record, used by the lens
 let records = [];
 let currentIndex = -1;
@@ -3649,10 +3699,20 @@ function toggleReviewMode() {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closeConsistencyBoard(); closeCompareView(); exitReviewMode(); return; }
+  if (e.key === 'Escape') { hideIssuePopup(); closeConsistencyBoard(); closeCompareView(); exitReviewMode(); return; }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    markOk();
+    return;
+  }
   const tag = document.activeElement ? document.activeElement.tagName : '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   const key = e.key.toLowerCase();
+  if (/^[1-6]$/.test(key)) {
+    e.preventDefault();
+    handleIssueShortcut(Number(key));
+    return;
+  }
   if (key === 'h' && !e.repeat) { e.preventDefault(); toggleMainViewMode(); return; }
   if (key === 'f' || e.key === 'ArrowRight') { e.preventDefault(); nextItem(); }
   else if (key === 'd' || e.key === 'ArrowLeft') { e.preventDefault(); prevItem(); }
@@ -4043,6 +4103,7 @@ function initMagnifier() {
   });
   canvas.addEventListener('mouseleave', () => lens.classList.add('hidden'));
   canvas.addEventListener('click', handleCanvasObjectSelect);
+  canvas.addEventListener('dblclick', handleCanvasIssuePopup);
   updateReviewToolMode();
 }
 
@@ -4095,18 +4156,37 @@ function handleCanvasObjectSelect(e) {
   const record = records[currentIndex];
   if (!record) return;
   const idx = findBoxAtCanvasPoint(e.clientX, e.clientY);
-  selectedBoxIndices.clear();
   if (idx < 0) {
-    issueTarget = null;
-    activeBoxIndex = -1;
+    if (!e.shiftKey) {
+      selectedBoxIndices.clear();
+      issueTarget = null;
+      activeBoxIndex = -1;
+    }
     renderCurrent();
     return;
   }
-  selectedBoxIndices.add(idx);
+  if (e.shiftKey) {
+    if (selectedBoxIndices.has(idx)) selectedBoxIndices.delete(idx);
+    else selectedBoxIndices.add(idx);
+  } else {
+    selectedBoxIndices.clear();
+    selectedBoxIndices.add(idx);
+  }
   activeBoxIndex = idx;
-  issueTarget = { type: 'box', boxIndex: idx, className: record.boxes[idx]?.className };
+  issueTarget = null;
+  if (selectedBoxIndices.size === 1) {
+    const onlyIdx = Array.from(selectedBoxIndices)[0];
+    issueTarget = { type: 'box', boxIndex: onlyIdx, className: record.boxes[onlyIdx]?.className };
+  }
   loadIssueToForm();
   renderCurrent();
+}
+
+function handleCanvasIssuePopup(e) {
+  if (reviewToolMode !== 'select') return;
+  e.preventDefault();
+  handleCanvasObjectSelect(e);
+  showIssuePopup(e.clientX, e.clientY);
 }
 
 function findBoxAtCanvasPoint(clientX, clientY) {
@@ -4250,34 +4330,96 @@ function buildIssueChecks() {
   const wrap = document.getElementById('issueChecks');
   wrap.innerHTML = `
     <div class="issue-column">
-      ${issueCheckHtml('wrong_class', 'Class mismatch')}
-      ${issueCheckHtml('wrong_box', 'Size')}
+      ${issueCheckHtml('wrong_class', 'Class mismatch', 1)}
+      ${issueCheckHtml('wrong_box', 'Size', 2)}
     </div>
     <div class="issue-column">
-      ${issueCheckHtml('missing', 'Missing')}
-      ${issueCheckHtml('unnecessary', 'Delete')}
+      ${issueCheckHtml('missing', 'Missing', 3)}
+      ${issueCheckHtml('unnecessary', 'Delete', 4)}
     </div>
     <div class="issue-column">
-      ${issueCheckHtml('consis', 'Consis')}
-      <button type="button" id="commentToggleBtn" onclick="toggleCommentField(true)">COMMENT</button>
+      ${issueCheckHtml('consis', 'Consis', 5)}
+      <button type="button" class="check" id="commentToggleBtn" onclick="toggleCommentField(true)"><span class="issue-num">6</span> Comment</button>
     </div>
   `;
+  renderIssuePopover();
 }
 buildIssueChecks();
 
-function issueCheckHtml(value, label) {
-  return `<label class="check"><input type="checkbox" value="${value}" onchange="handleIssueDraftChange(this)"> ${label}</label>`;
+function issueCheckHtml(value, label, shortcut) {
+  return `<label class="check"><input type="checkbox" value="${value}" onchange="handleIssueDraftChange(this)"> <span class="issue-num">${shortcut}</span> ${label}</label>`;
 }
 
 function handleIssueDraftChange(input) {
   updateMissingClassVisibility();
   if (input?.value === 'consis' && input.checked) openConsistencyBoard();
+  hideIssuePopup();
 }
 
 function toggleCommentField(show) {
   const field = document.getElementById('commentField');
   field.classList.toggle('hidden', show === false);
+  document.getElementById('commentToggleBtn')?.classList.toggle('active', show !== false);
   if (show !== false) document.getElementById('noteInput').focus();
+  hideIssuePopup();
+}
+
+function renderIssuePopover() {
+  const popover = document.getElementById('issuePopover');
+  if (!popover) return;
+  popover.innerHTML = `
+    <div class="issue-column">
+      <button type="button" class="check" onclick="toggleIssueType('wrong_class')"><span class="issue-num">1</span> Class mismatch</button>
+      <button type="button" class="check" onclick="toggleIssueType('wrong_box')"><span class="issue-num">2</span> Size</button>
+    </div>
+    <div class="issue-column">
+      <button type="button" class="check" onclick="toggleIssueType('missing')"><span class="issue-num">3</span> Missing</button>
+      <button type="button" class="check" onclick="toggleIssueType('unnecessary')"><span class="issue-num">4</span> Delete</button>
+    </div>
+    <div class="issue-column">
+      <button type="button" class="check" onclick="toggleIssueType('consis')"><span class="issue-num">5</span> Consis</button>
+      <button type="button" class="check" onclick="toggleCommentField(true)"><span class="issue-num">6</span> Comment</button>
+    </div>
+  `;
+}
+
+function showIssuePopup(clientX, clientY) {
+  const popover = document.getElementById('issuePopover');
+  const frame = document.getElementById('canvasFrame');
+  if (!popover || !frame) return;
+  const frameRect = frame.getBoundingClientRect();
+  const width = Math.min(280, frameRect.width - 24);
+  const left = Math.max(12, Math.min(clientX - frameRect.left, frameRect.width - width - 12));
+  const top = Math.max(42, Math.min(clientY - frameRect.top, frameRect.height - 150));
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+  popover.classList.remove('hidden');
+}
+
+function hideIssuePopup() {
+  document.getElementById('issuePopover')?.classList.add('hidden');
+}
+
+function toggleIssueType(type) {
+  const input = document.querySelector(`#issueChecks input[value="${type}"]`);
+  if (!input) return;
+  input.checked = !input.checked;
+  handleIssueDraftChange(input);
+}
+
+function handleIssueShortcut(number) {
+  const shortcuts = {
+    1: 'wrong_class',
+    2: 'wrong_box',
+    3: 'missing',
+    4: 'unnecessary',
+    5: 'consis'
+  };
+  if (number === 6) {
+    toggleCommentField(true);
+    return;
+  }
+  if (shortcuts[number]) toggleIssueType(shortcuts[number]);
 }
 
 function updateMissingClassVisibility() {
@@ -4292,6 +4434,7 @@ function loadIssueToForm() {
   setSelectedActionClasses(entry?.missingClass || '');
   document.getElementById('noteInput').value = entry?.note || '';
   document.getElementById('commentField').classList.toggle('hidden', !entry?.note);
+  document.getElementById('commentToggleBtn')?.classList.toggle('active', !!entry?.note);
   updateMissingClassVisibility();
 }
 
