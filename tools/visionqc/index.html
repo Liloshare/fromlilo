@@ -777,10 +777,16 @@
       border-radius: 6px;
       padding: 7px 8px;
       display: grid;
-      grid-template-columns: 18px 1fr;
+      grid-template-columns: 18px 1fr auto;
       gap: 8px;
       align-items: center;
       font-size: 12px;
+    }
+    .box-kind {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
     }
     .box-row .btn-row { grid-column: 1 / -1; }
     .box-row button.active {
@@ -802,31 +808,34 @@
     }
     .issue-log-field {
       position: sticky;
-      bottom: 10px;
+      top: 50%;
       width: 100%;
       z-index: 2;
-      background: rgba(245,244,241,.96);
-      border: 1px solid var(--line);
+      background: #16151d;
+      color: #f7f5ef;
+      border: 1px solid rgba(255,255,255,.14);
       padding: 8px;
       box-shadow: 0 10px 28px rgba(0,0,0,.12);
     }
+    .issue-log-field label { color: rgba(255,255,255,.72); }
     .issue-log-field .issues-list { max-height: 150px; }
     .issue-row {
-      border: 1px solid #eec4d0;
-      background: #fbf2f4;
+      border: 1px solid rgba(255,255,255,.14);
+      background: #050505;
       border-radius: 6px;
-      padding: 8px;
-      font-size: 12px;
+      padding: 6px 7px;
+      font-size: 11px;
       display: grid;
       grid-template-columns: 1fr auto;
-      gap: 4px 8px;
+      gap: 2px 6px;
     }
     .issue-row strong { overflow-wrap: anywhere; }
     .issue-row-main {
       display: grid;
-      gap: 4px;
+      gap: 2px;
       min-width: 0;
     }
+    .issue-row span { color: rgba(255,255,255,.78); }
     .issue-actions {
       display: flex;
       gap: 4px;
@@ -834,10 +843,13 @@
     }
     .issue-actions button {
       min-height: 0;
-      width: 26px;
-      height: 26px;
+      width: 22px;
+      height: 22px;
       padding: 0;
       line-height: 1;
+      border-color: rgba(255,255,255,.2);
+      color: #fff;
+      background: rgba(255,255,255,.08);
     }
 
     .issue-inline-select {
@@ -1732,8 +1744,8 @@
             </button>
           </div>
           <div class="tool-switch" role="group" aria-label="VIEW MODE">
-            <button id="overlayModeBtn" onclick="setMainViewMode('overlay')" title="OVERLAY">OV</button>
-            <button id="imageModeBtn" onclick="setMainViewMode('image')" title="ORIGINAL">OR</button>
+            <button id="overlayModeBtn" onclick="setMainViewMode('overlay')" title="HIDE OFF">OFF</button>
+            <button id="imageModeBtn" onclick="setMainViewMode('image')" title="HIDE ON">ON</button>
           </div>
           <button id="fullscreenToggleBtn" onclick="toggleReviewMode()" title="FOCUS">FOCUS</button>
         </div>
@@ -2565,6 +2577,9 @@ async function buildLabelMeAnnotationMap(files) {
       if (Array.isArray(shape.points) && shape.points.length >= 3) {
         return [makePolygonShape(className, shape.points, idx + 1, imgW, imgH)];
       }
+      if (shape.shape_type === 'point' && Array.isArray(shape.points) && shape.points.length >= 1) {
+        return [makeKeypointShape(className, shape.points[0], idx + 1, imgW, imgH)];
+      }
       return [];
     }).filter(Boolean);
     grouped.set(key, { file, image: { file_name: data.imagePath, width: imgW, height: imgH }, boxes });
@@ -2605,6 +2620,13 @@ function rectangleToShape(className, points, row, imgW, imgH) {
   const h = Math.abs(Number(y2) - Number(y1));
   if (![x, y, w, h].every(Number.isFinite) || !imgW || !imgH) return null;
   return { type: 'bbox', className, classId: classes.indexOf(className), xc: (x + w / 2) / imgW, yc: (y + h / 2) / imgH, bw: w / imgW, bh: h / imgH, row };
+}
+
+function makeKeypointShape(className, point, row, imgW, imgH) {
+  const [x, y] = point || [];
+  const px = Number(x), py = Number(y);
+  if (![px, py].every(Number.isFinite) || !imgW || !imgH) return null;
+  return { type: 'keypoint', className, classId: classes.indexOf(className), xc: px / imgW, yc: py / imgH, bw: 0.012, bh: 0.012, points: [{ x: px / imgW, y: py / imgH }], row };
 }
 
 async function handleExcelFilter(file) {
@@ -3732,7 +3754,8 @@ async function renderCurrent() {
     const row = document.createElement('div');
     row.className = 'box-row';
     row.title = className;
-    row.innerHTML = `<span class="swatch" style="background:${classColors[className] || '#a8a4bd'}"></span><span class="box-class-once">${escapeHtml(className)}</span><div class="btn-row"></div>`;
+    const typeSummary = objectTypeSummary(items.map(item => item.box));
+    row.innerHTML = `<span class="swatch" style="background:${classColors[className] || '#a8a4bd'}"></span><span class="box-class-once">${escapeHtml(className)}</span><span class="box-kind">${escapeHtml(typeSummary)}</span><div class="btn-row"></div>`;
     const actions = row.querySelector('.btn-row');
     items.forEach(({ idx }) => {
       const btn = document.createElement('button');
@@ -3761,6 +3784,15 @@ async function renderCurrent() {
     });
     boxList.appendChild(row);
   });
+}
+
+function objectTypeSummary(items) {
+  const counts = items.reduce((acc, box) => {
+    const type = box.type === 'polygon' ? 'polygon' : box.type === 'keypoint' ? 'keypoint' : 'box';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts).map(([type, count]) => `${type} ${count}`).join(' / ');
 }
 
 async function renderCanvas(canvas, record, maxWidth, isMain = false) {
@@ -3832,6 +3864,11 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     ctx.fillStyle = color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.fill();
+    else if (box.type === 'keypoint') {
+      ctx.beginPath();
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(4, canvasW / 180), 0, Math.PI * 2);
+      ctx.fill();
+    }
     else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     ctx.globalAlpha = 1;
     const canShowSelection = record === records[currentIndex];
@@ -3843,6 +3880,11 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     ctx.strokeStyle = isActive ? '#ffffff' : color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.stroke();
+    else if (box.type === 'keypoint') {
+      ctx.beginPath();
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(5, canvasW / 160), 0, Math.PI * 2);
+      ctx.stroke();
+    }
     else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 0.72;
@@ -3850,6 +3892,10 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
     ctx.strokeStyle = 'rgba(255,255,255,0.82)';
     if (box.type === 'polygon') {
       drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
+      ctx.stroke();
+    } else if (box.type === 'keypoint') {
+      ctx.beginPath();
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(7, canvasW / 140), 0, Math.PI * 2);
       ctx.stroke();
     } else {
       ctx.strokeRect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
@@ -3905,6 +3951,11 @@ function drawClassBoxes(ctx, record, className, canvasW, canvasH, imgW, imgH) {
     ctx.fillStyle = color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.fill();
+    else if (box.type === 'keypoint') {
+      ctx.beginPath();
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(4, canvasW / 180), 0, Math.PI * 2);
+      ctx.fill();
+    }
     else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
     ctx.globalAlpha = 1;
     ctx.shadowColor = color;
@@ -3914,6 +3965,11 @@ function drawClassBoxes(ctx, record, className, canvasW, canvasH, imgW, imgH) {
     ctx.strokeStyle = '#ffffff';
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.stroke();
+    else if (box.type === 'keypoint') {
+      ctx.beginPath();
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(6, canvasW / 140), 0, Math.PI * 2);
+      ctx.stroke();
+    }
     else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
     ctx.shadowBlur = 0;
     ctx.lineWidth = baseLineWidth;
@@ -4206,6 +4262,10 @@ function findBoxAtCanvasPoint(clientX, clientY) {
 
 function pointInShape(shape, x, y) {
   if (shape.type === 'polygon' && shape.points?.length >= 3) return pointInPolygon(shape.points, x, y);
+  if (shape.type === 'keypoint') {
+    const hit = Math.max(0.012, shape.bw || 0.012);
+    return Math.abs(x - shape.xc) <= hit && Math.abs(y - shape.yc) <= hit;
+  }
   return (
     x >= shape.xc - shape.bw / 2 &&
     x <= shape.xc + shape.bw / 2 &&
@@ -4240,6 +4300,11 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     ctx.strokeStyle = isActive ? '#ffffff' : color;
     drawLensShape(ctx, box, sx, sy, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.stroke();
+    else if (box.type === 'keypoint') {
+      ctx.beginPath();
+      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     else {
       const rect = lensShapeRect(box, sx, sy, imgW, imgH, scaleX, scaleY);
       ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
@@ -4250,6 +4315,10 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     ctx.strokeStyle = 'rgba(255,255,255,0.82)';
     if (box.type === 'polygon') {
       drawLensShape(ctx, box, sx, sy, imgW, imgH, scaleX, scaleY);
+      ctx.stroke();
+    } else if (box.type === 'keypoint') {
+      ctx.beginPath();
+      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 10, 0, Math.PI * 2);
       ctx.stroke();
     } else {
       const rect = lensShapeRect(box, sx, sy, imgW, imgH, scaleX, scaleY);
@@ -4591,38 +4660,59 @@ function renderIssuesList() {
     list.innerHTML = '<div class="hint">NO ISSUE</div>';
     return;
   }
-  list.innerHTML = rows.map(issue => `
+  const groups = groupedIssueRows(rows);
+  list.innerHTML = groups.map(group => `
     <div class="issue-row">
       <div class="issue-row-main">
-        <strong>${escapeHtml(issue.targetLabel || 'IMAGE')}</strong>
-        <span>${escapeHtml(formatIssueTypes(issue.types || [])) || '-'} ${issue.missingClass ? ' / MISSING: ' + escapeHtml(issue.missingClass) : ''}</span>
-        ${issue.note ? `<span>${escapeHtml(issue.note)}</span>` : ''}
+        <strong>${escapeHtml(group.label)}</strong>
+        <span>${escapeHtml(formatIssueTypes(group.types)) || '-'}${group.missingClass ? ' / ' + escapeHtml(group.missingClass) : ''}${group.notes ? ' / ' + escapeHtml(group.notes) : ''}</span>
       </div>
       <div class="issue-actions">
-        <button type="button" data-edit-issue="${escapeHtml(issue.targetKey)}" title="EDIT">✎</button>
-        <button type="button" data-delete-issue="${escapeHtml(issue.targetKey)}" title="DELETE">×</button>
+        <button type="button" data-delete-issue-group="${escapeHtml(group.key)}" title="DELETE">×</button>
       </div>
     </div>
   `).join('');
-  list.querySelectorAll('[data-delete-issue]').forEach(btn => {
-    btn.addEventListener('click', () => removeIssue(record.id, btn.dataset.deleteIssue));
-  });
-  list.querySelectorAll('[data-edit-issue]').forEach(btn => {
+  list.querySelectorAll('[data-delete-issue-group]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const entry = rows.find(item => item.targetKey === btn.dataset.editIssue);
-      if (!entry) return;
-      issueTarget = entry.target || { type: 'image' };
-      selectedBoxIndices.clear();
-      if (issueTarget.type === 'box') selectedBoxIndices.add(issueTarget.boxIndex);
-      if (issueTarget.type === 'boxes') issueTarget.boxIndices.forEach(idx => selectedBoxIndices.add(idx));
-      activeBoxIndex = issueTarget.type === 'box' ? issueTarget.boxIndex : -1;
-      loadIssueToForm();
-      renderCurrent();
-      document.getElementById('noteInput').focus();
+      const group = groups.find(item => item.key === btn.dataset.deleteIssueGroup);
+      if (!group) return;
+      group.keys.forEach(key => removeIssue(record.id, key));
     });
   });
 }
 renderIssuesList();
+
+function groupedIssueRows(rows) {
+  const map = new Map();
+  rows.forEach(issue => {
+    const target = issue.target || { type: 'image' };
+    const key = JSON.stringify(target);
+    if (!map.has(key)) {
+      map.set(key, { key, keys: [], label: compactTargetLabel(issue), types: new Set(), missing: new Set(), notes: new Set() });
+    }
+    const group = map.get(key);
+    group.keys.push(issue.targetKey);
+    (issue.types || []).forEach(type => group.types.add(type));
+    if (issue.missingClass) group.missing.add(issue.missingClass);
+    if (issue.note) group.notes.add(issue.note);
+  });
+  return Array.from(map.values()).map(group => ({
+    key: group.key,
+    keys: group.keys,
+    label: group.label,
+    types: Array.from(group.types),
+    missingClass: Array.from(group.missing).join(', '),
+    notes: Array.from(group.notes).join(' | ')
+  }));
+}
+
+function compactTargetLabel(issue) {
+  const target = issue.target || {};
+  if (!target.type || target.type === 'image') return 'IMAGE';
+  if (target.type === 'box') return `OBJECT ${Number(target.boxIndex) + 1}${target.className ? ' / ' + target.className : ''}`;
+  if (target.type === 'boxes') return `OBJECTS ${(target.boxIndices || []).map(idx => Number(idx) + 1).join(', ')}`;
+  return issue.targetLabel || 'OBJECT';
+}
 
 function formatIssueTypes(types) {
   const labels = {
