@@ -1,3 +1,3 @@
-# BBox QC Tool
+# Vision QC Tool
 
-Upload the BBox QC tool files here.
+Upload the Vision QC tool files here.
