@@ -435,7 +435,7 @@
       gap: 10px;
     }
     .viewer-main { min-width: 0; position: relative; }
-    .viewer-side { display: grid; gap: 10px; align-content: start; }
+    .viewer-side { display: grid; gap: 10px; align-content: start; position: relative; }
     .canvas-frame {
       border: 1px solid var(--line);
       border-radius: var(--radius);
@@ -453,11 +453,11 @@
       cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 15 15'%3E%3Crect x='0.5' y='0.5' width='14' height='14' fill='none' stroke='%23000000' stroke-width='1'/%3E%3Crect x='1.5' y='1.5' width='12' height='12' fill='none' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E") 7 7, crosshair;
     }
     .canvas-bezel {
-      position: absolute;
-      top: 8px;
+      position: fixed;
+      top: 10px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 4;
+      z-index: 230;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -487,7 +487,8 @@
       color: inherit;
       white-space: nowrap;
     }
-    #mainViewToggleBtn.active { background: #e1e6fa; color: #5570c9; border-color: var(--accent); }
+    #overlayModeBtn.active,
+    #imageModeBtn.active { background: #e1e6fa; color: #5570c9; }
     #mainCanvas.select-mode { cursor: pointer; }
     .tool-switch {
       display: inline-flex;
@@ -724,18 +725,7 @@
       color: inherit;
       justify-content: flex-start;
     }
-    .issue-num {
-      width: 16px;
-      height: 16px;
-      border: 1px solid var(--line);
-      border-radius: 50%;
-      display: inline-grid;
-      place-items: center;
-      font-size: 10px;
-      font-weight: 900;
-      background: rgba(255,255,255,.45);
-      flex: 0 0 auto;
-    }
+    .issue-num { font-size: 11px; font-weight: 900; color: var(--muted); flex: 0 0 auto; }
     .check:has(input:checked) {
       border-color: #eec4d0;
       background: #fbeef1;
@@ -811,12 +801,10 @@
       overflow: auto;
     }
     .issue-log-field {
-      position: fixed;
-      left: 50%;
-      bottom: 14px;
-      transform: translateX(-50%);
-      width: min(560px, calc(100vw - 28px));
-      z-index: 210;
+      position: sticky;
+      bottom: 10px;
+      width: 100%;
+      z-index: 2;
       background: rgba(245,244,241,.96);
       border: 1px solid var(--line);
       padding: 8px;
@@ -1743,7 +1731,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3 19 12 12 14 9 21 5 3Z"></path></svg>
             </button>
           </div>
-          <button id="mainViewToggleBtn" onclick="toggleMainViewMode()" title="VIEW">IMAGE</button>
+          <div class="tool-switch" role="group" aria-label="VIEW MODE">
+            <button id="overlayModeBtn" onclick="setMainViewMode('overlay')" title="OVERLAY">OV</button>
+            <button id="imageModeBtn" onclick="setMainViewMode('image')" title="ORIGINAL">OR</button>
+          </div>
           <button id="fullscreenToggleBtn" onclick="toggleReviewMode()" title="FOCUS">FOCUS</button>
         </div>
       </div>
@@ -1784,9 +1775,6 @@
             <div class="field hidden" id="commentField">
               <label>COMMENT</label>
               <textarea id="noteInput" placeholder="COMMENT"></textarea>
-            </div>
-            <div class="btn-row">
-              <button class="success" onclick="markOk()">SAVE</button>
             </div>
           </div>
 
@@ -3807,10 +3795,15 @@ function toggleMainViewMode() {
   renderCurrent();
 }
 
+function setMainViewMode(mode) {
+  mainViewMode = mode === 'image' ? 'image' : 'overlay';
+  updateMainViewToggleBtn();
+  renderCurrent();
+}
+
 function updateMainViewToggleBtn() {
-  const btn = document.getElementById('mainViewToggleBtn');
-  btn.textContent = mainViewMode === 'overlay' ? 'IMAGE' : 'OVERLAY';
-  btn.classList.toggle('active', mainViewMode === 'image');
+  document.getElementById('overlayModeBtn')?.classList.toggle('active', mainViewMode === 'overlay');
+  document.getElementById('imageModeBtn')?.classList.toggle('active', mainViewMode === 'image');
 }
 
 function setReviewToolMode(mode) {
@@ -4330,15 +4323,15 @@ function buildIssueChecks() {
   const wrap = document.getElementById('issueChecks');
   wrap.innerHTML = `
     <div class="issue-column">
-      ${issueCheckHtml('wrong_class', 'Class mismatch', 1)}
-      ${issueCheckHtml('wrong_box', 'Size', 2)}
+      ${issueButtonHtml('wrong_class', 'Class mismatch', 1)}
+      ${issueButtonHtml('wrong_box', 'Size', 2)}
     </div>
     <div class="issue-column">
-      ${issueCheckHtml('missing', 'Missing', 3)}
-      ${issueCheckHtml('unnecessary', 'Delete', 4)}
+      ${issueButtonHtml('missing', 'Missing', 3)}
+      ${issueButtonHtml('unnecessary', 'Delete', 4)}
     </div>
     <div class="issue-column">
-      ${issueCheckHtml('consis', 'Consis', 5)}
+      ${issueButtonHtml('consis', 'Consis', 5)}
       <button type="button" class="check" id="commentToggleBtn" onclick="toggleCommentField(true)"><span class="issue-num">6</span> Comment</button>
     </div>
   `;
@@ -4346,8 +4339,8 @@ function buildIssueChecks() {
 }
 buildIssueChecks();
 
-function issueCheckHtml(value, label, shortcut) {
-  return `<label class="check"><input type="checkbox" value="${value}" onchange="handleIssueDraftChange(this)"> <span class="issue-num">${shortcut}</span> ${label}</label>`;
+function issueButtonHtml(value, label, shortcut) {
+  return `<button type="button" class="check" onclick="saveIssueType('${value}')"><span class="issue-num">${shortcut}</span> ${label}</button>`;
 }
 
 function handleIssueDraftChange(input) {
@@ -4369,15 +4362,15 @@ function renderIssuePopover() {
   if (!popover) return;
   popover.innerHTML = `
     <div class="issue-column">
-      <button type="button" class="check" onclick="toggleIssueType('wrong_class')"><span class="issue-num">1</span> Class mismatch</button>
-      <button type="button" class="check" onclick="toggleIssueType('wrong_box')"><span class="issue-num">2</span> Size</button>
+      <button type="button" class="check" onclick="saveIssueType('wrong_class')"><span class="issue-num">1</span> Class mismatch</button>
+      <button type="button" class="check" onclick="saveIssueType('wrong_box')"><span class="issue-num">2</span> Size</button>
     </div>
     <div class="issue-column">
-      <button type="button" class="check" onclick="toggleIssueType('missing')"><span class="issue-num">3</span> Missing</button>
-      <button type="button" class="check" onclick="toggleIssueType('unnecessary')"><span class="issue-num">4</span> Delete</button>
+      <button type="button" class="check" onclick="saveIssueType('missing')"><span class="issue-num">3</span> Missing</button>
+      <button type="button" class="check" onclick="saveIssueType('unnecessary')"><span class="issue-num">4</span> Delete</button>
     </div>
     <div class="issue-column">
-      <button type="button" class="check" onclick="toggleIssueType('consis')"><span class="issue-num">5</span> Consis</button>
+      <button type="button" class="check" onclick="saveIssueType('consis')"><span class="issue-num">5</span> Consis</button>
       <button type="button" class="check" onclick="toggleCommentField(true)"><span class="issue-num">6</span> Comment</button>
     </div>
   `;
@@ -4400,11 +4393,32 @@ function hideIssuePopup() {
   document.getElementById('issuePopover')?.classList.add('hidden');
 }
 
-function toggleIssueType(type) {
-  const input = document.querySelector(`#issueChecks input[value="${type}"]`);
-  if (!input) return;
-  input.checked = !input.checked;
-  handleIssueDraftChange(input);
+function saveIssueType(type) {
+  const record = records[currentIndex];
+  if (!record) return;
+  if (type === 'consis') {
+    document.querySelectorAll('#issueChecks input').forEach(input => input.checked = input.value === 'consis');
+    openConsistencyBoard();
+    hideIssuePopup();
+    return;
+  }
+  const target = buildCurrentIssueTarget(record);
+  upsertIssue(record, {
+    target,
+    targetKey: `${targetKey(target)}:${type}:${Date.now()}`,
+    targetLabel: targetLabel(target),
+    types: [type],
+    missingClass: '',
+    note: ''
+  });
+  reviewedSet.add(record.id);
+  saveReviewResult(record, actionFromIssue(getRecordIssue(record)) || 'issue', getRecordIssue(record));
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
+  resetIssueDraft();
+  hideIssuePopup();
+  renderCurrent();
 }
 
 function handleIssueShortcut(number) {
@@ -4419,7 +4433,7 @@ function handleIssueShortcut(number) {
     toggleCommentField(true);
     return;
   }
-  if (shortcuts[number]) toggleIssueType(shortcuts[number]);
+  if (shortcuts[number]) saveIssueType(shortcuts[number]);
 }
 
 function updateMissingClassVisibility() {
