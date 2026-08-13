@@ -811,13 +811,11 @@
       top: 50%;
       width: 100%;
       z-index: 2;
-      background: #16151d;
-      color: #f7f5ef;
-      border: 1px solid rgba(255,255,255,.14);
-      padding: 8px;
-      box-shadow: 0 10px 28px rgba(0,0,0,.12);
+      color: var(--ink);
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
     }
-    .issue-log-field label { color: rgba(255,255,255,.72); }
+    .issue-log-field label { color: var(--muted); }
     .issue-log-field .issues-list { max-height: 150px; }
     .issue-row {
       border: 1px solid rgba(255,255,255,.14);
@@ -1259,6 +1257,7 @@
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 12px;
+      min-height: 584px;
     }
     .consis-card {
       border: 1px solid #d8d8d8;
@@ -1267,7 +1266,9 @@
       gap: 6px;
       padding: 8px;
       position: relative;
+      min-height: 284px;
     }
+    .consis-card.empty { opacity: .18; }
     .consis-remove {
       position: absolute;
       top: 12px;
@@ -1679,6 +1680,7 @@
           <button onclick="exportCsv()" id="csvBtn" disabled>XLSX</button>
           <button onclick="exportJson()" id="jsonBtn" disabled>JSON</button>
           <button onclick="openFeedbackDeck()" id="feedbackBtn" disabled>FEEDBACK</button>
+          <button onclick="downloadMissingImages()" id="missingPngBtn" disabled>MISSING PNG</button>
         </div>
       </div>
     </section>
@@ -1744,8 +1746,8 @@
             </button>
           </div>
           <div class="tool-switch" role="group" aria-label="VIEW MODE">
-            <button id="overlayModeBtn" onclick="setMainViewMode('overlay')" title="HIDE OFF">OFF</button>
-            <button id="imageModeBtn" onclick="setMainViewMode('image')" title="HIDE ON">ON</button>
+            <button id="overlayModeBtn" onclick="setMainViewMode('overlay')" title="OVERLAY ON">ON</button>
+            <button id="imageModeBtn" onclick="setMainViewMode('image')" title="OVERLAY OFF">OFF</button>
           </div>
           <button id="fullscreenToggleBtn" onclick="toggleReviewMode()" title="FOCUS">FOCUS</button>
         </div>
@@ -2000,6 +2002,8 @@ let objectUrlCache = new Map();
 let activeBoxIndex = -1;
 let issueTarget = null;
 let selectedBoxIndices = new Set();
+let missingArrowMode = false;
+let missingArrowDraft = null;
 
 // review-mode ("하나씩 넘기기") navigation queue, snapshot of the filtered list at the
 // moment review mode was entered so marking a record OK/issue doesn't yank it out from
@@ -2921,6 +2925,7 @@ async function runValidation() {
     document.getElementById('csvBtn').disabled = false;
     document.getElementById('jsonBtn').disabled = false;
     document.getElementById('feedbackBtn').disabled = false;
+    document.getElementById('missingPngBtn').disabled = false;
     document.getElementById('statusText').textContent = 'READY';
     hideLoading();
   });
@@ -4020,9 +4025,20 @@ async function renderConsistencyBoard() {
   const className = document.getElementById('consisClassSelect').value;
   document.getElementById('consisTitle').textContent = title;
   grid.innerHTML = '';
-  for (const record of consistencyRows) {
+  for (let i = 0; i < 8; i++) {
+    const record = consistencyRows[i];
     const card = document.createElement('div');
     card.className = 'consis-card';
+    if (!record) {
+      card.classList.add('empty');
+      card.innerHTML = '<canvas></canvas><div class="consis-caption"></div>';
+      grid.appendChild(card);
+      const canvas = card.querySelector('canvas');
+      canvas.width = 360;
+      canvas.height = 225;
+      canvas.getContext('2d').fillRect(0, 0, canvas.width, canvas.height);
+      continue;
+    }
     card.innerHTML = `<button class="consis-remove" type="button" title="REMOVE">×</button><canvas></canvas><div class="consis-caption">${escapeHtml(record.imageFile?.name || record.baseName)}</div>`;
     grid.appendChild(card);
     card.querySelector('.consis-remove').addEventListener('click', () => removeConsistencyRow(record.id));
@@ -4153,6 +4169,9 @@ function initMagnifier() {
   canvas.addEventListener('mouseleave', () => lens.classList.add('hidden'));
   canvas.addEventListener('click', handleCanvasObjectSelect);
   canvas.addEventListener('dblclick', handleCanvasIssuePopup);
+  canvas.addEventListener('mousedown', startMissingArrow);
+  canvas.addEventListener('mousemove', previewMissingArrow);
+  canvas.addEventListener('mouseup', finishMissingArrow);
   updateReviewToolMode();
 }
 
@@ -4201,6 +4220,7 @@ function drawMagnifier(clientX, clientY) {
 }
 
 function handleCanvasObjectSelect(e) {
+  if (missingArrowMode) return;
   if (reviewToolMode !== 'select') return;
   const record = records[currentIndex];
   if (!record) return;
@@ -4233,9 +4253,72 @@ function handleCanvasObjectSelect(e) {
 
 function handleCanvasIssuePopup(e) {
   if (reviewToolMode !== 'select') return;
+  if (missingArrowMode) return;
   e.preventDefault();
   handleCanvasObjectSelect(e);
   showIssuePopup(e.clientX, e.clientY);
+}
+
+function startMissingArrow(e) {
+  if (!missingArrowMode) return;
+  e.preventDefault();
+  const canvas = document.getElementById('mainCanvas');
+  const point = canvasPoint(e, canvas);
+  missingArrowDraft = { type: 'arrow', color: '#ff2d55', x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+}
+
+async function previewMissingArrow(e) {
+  if (!missingArrowMode || !missingArrowDraft) return;
+  const canvas = document.getElementById('mainCanvas');
+  const point = canvasPoint(e, canvas);
+  missingArrowDraft.x2 = point.x;
+  missingArrowDraft.y2 = point.y;
+  const record = records[currentIndex];
+  if (!record) return;
+  await renderCanvas(canvas, record, 1200, true);
+  drawFeedbackShape(canvas.getContext('2d'), missingArrowDraft, canvas.width, canvas.height, true);
+}
+
+async function finishMissingArrow(e) {
+  if (!missingArrowMode || !missingArrowDraft) return;
+  const canvas = document.getElementById('mainCanvas');
+  const point = canvasPoint(e, canvas);
+  missingArrowDraft.x2 = point.x;
+  missingArrowDraft.y2 = point.y;
+  const arrow = { ...missingArrowDraft };
+  missingArrowMode = false;
+  missingArrowDraft = null;
+  await saveMissingArrowIssue(arrow);
+}
+
+async function saveMissingArrowIssue(arrow) {
+  const record = records[currentIndex];
+  if (!record) return;
+  const imageData = await renderMissingIssueImage(record, arrow);
+  upsertIssue(record, {
+    target: { type: 'image' },
+    targetKey: `image:missing:${Date.now()}`,
+    targetLabel: 'IMAGE',
+    types: ['missing'],
+    missingClass: '',
+    note: '',
+    arrow,
+    imageData
+  });
+  reviewedSet.add(record.id);
+  saveReviewResult(record, actionFromIssue(getRecordIssue(record)) || 'issue', getRecordIssue(record));
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
+  resetIssueDraft();
+  renderCurrent();
+}
+
+async function renderMissingIssueImage(record, arrow) {
+  const canvas = document.createElement('canvas');
+  await renderCanvas(canvas, record, 1200, true);
+  drawFeedbackShape(canvas.getContext('2d'), arrow, canvas.width, canvas.height, false);
+  return canvas.toDataURL('image/png');
 }
 
 function findBoxAtCanvasPoint(clientX, clientY) {
@@ -4420,9 +4503,12 @@ function handleIssueDraftChange(input) {
 
 function toggleCommentField(show) {
   const field = document.getElementById('commentField');
-  field.classList.toggle('hidden', show === false);
-  document.getElementById('commentToggleBtn')?.classList.toggle('active', show !== false);
-  if (show !== false) document.getElementById('noteInput').focus();
+  const input = document.getElementById('noteInput');
+  const shouldClose = !field.classList.contains('hidden') && !input.value.trim() && show !== false;
+  const shouldShow = show === false || shouldClose ? false : true;
+  field.classList.toggle('hidden', !shouldShow);
+  document.getElementById('commentToggleBtn')?.classList.toggle('active', shouldShow);
+  if (shouldShow) input.focus();
   hideIssuePopup();
 }
 
@@ -4465,6 +4551,12 @@ function hideIssuePopup() {
 function saveIssueType(type) {
   const record = records[currentIndex];
   if (!record) return;
+  if (type === 'missing') {
+    missingArrowMode = true;
+    missingArrowDraft = null;
+    hideIssuePopup();
+    return;
+  }
   if (type === 'consis') {
     document.querySelectorAll('#issueChecks input').forEach(input => input.checked = input.value === 'consis');
     openConsistencyBoard();
@@ -4767,6 +4859,26 @@ function buildIssueMatrixRows() {
   return rows;
 }
 
+function buildMissingRows() {
+  const rows = [['file', 'target', 'arrow', 'image_png_data_url']];
+  const scopedIds = new Set(scopedRecords().map(record => record.id));
+  Array.from(issueMap.values())
+    .filter(group => scopedIds.has(group.id))
+    .forEach(group => {
+      (group.issues || [])
+        .filter(issue => (issue.types || []).includes('missing'))
+        .forEach(issue => {
+          rows.push([
+            group.file || group.baseName || '',
+            compactTargetLabel(issue),
+            issue.arrow ? JSON.stringify(issue.arrow) : '',
+            issue.imageData || ''
+          ]);
+        });
+    });
+  return rows;
+}
+
 // Only images that actually carry label data are worth a row in the QC
 // export \u2014 matching what the gallery shows. missing-image/missing-label/
 // zero-box counts are still surfaced as summary numbers (see exportJson)
@@ -4944,9 +5056,48 @@ function downloadXlsx(sheets, filename) {
 
 function exportCsv() {
   const issueMatrixRows = buildIssueMatrixRows();
+  const missingRows = buildMissingRows();
   downloadXlsx([
-    { name: 'issue_check', rows: issueMatrixRows }
+    { name: 'issue_check', rows: issueMatrixRows },
+    { name: 'missing', rows: missingRows }
   ], 'bbox_qc_result.xlsx');
+}
+
+function downloadMissingImages() {
+  const files = [];
+  const scopedIds = new Set(scopedRecords().map(record => record.id));
+  Array.from(issueMap.values())
+    .filter(group => scopedIds.has(group.id))
+    .forEach(group => {
+      (group.issues || [])
+        .filter(issue => (issue.types || []).includes('missing') && issue.imageData)
+        .forEach((issue, index) => {
+          files.push({
+            name: `missing/${safeFileName(group.file || group.baseName || 'image')}_${index + 1}.png`,
+            data: dataUrlBytes(issue.imageData)
+          });
+        });
+    });
+  if (!files.length) return;
+  const blob = buildZip(files);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'visionqc_missing_images.zip';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function safeFileName(name) {
+  return String(name).replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120);
+}
+
+function dataUrlBytes(dataUrl) {
+  const base64 = String(dataUrl).split(',')[1] || '';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 function exportJson() {
@@ -5436,6 +5587,7 @@ function resetAll() {
   document.getElementById('csvBtn').disabled = true;
   document.getElementById('jsonBtn').disabled = true;
   document.getElementById('feedbackBtn').disabled = true;
+  document.getElementById('missingPngBtn').disabled = true;
   document.getElementById('gallery').innerHTML = '';
   document.getElementById('boxList').innerHTML = '';
   document.getElementById('mainCanvas').width = 1;
