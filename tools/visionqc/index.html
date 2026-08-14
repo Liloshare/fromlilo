@@ -341,8 +341,13 @@
       border-color: var(--danger);
       box-shadow: 0 0 0 2px rgba(209,99,125,.18), 0 8px 18px rgba(209,99,125,.16);
     }
-    .thumb.issue canvas {
-      opacity: .52;
+    .thumb.issue::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(209, 45, 82, .32);
+      z-index: 1;
+      pointer-events: none;
     }
     .thumb.bulk-selected {
       border-color: var(--accent);
@@ -1674,7 +1679,7 @@
           <div class="stat"><div class="num" id="statBoxes">0</div><div class="label">BOX</div></div>
           <div class="stat-separator"></div>
           <button class="stat filterable" type="button" data-gallery-filter="issue"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></button>
-          <button class="stat filterable" type="button" data-gallery-filter="done"><div class="num ok" id="statReviewed">0</div><div class="label">DONE</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="done"><div class="num ok" id="statReviewed">0</div><div class="label">PASS</div></button>
           <div class="stat"><div class="num" id="statProgress">0%</div><div class="label">RATE</div></div>
         </div>
         <div class="export-actions">
@@ -1713,6 +1718,7 @@
             <option value="">ISSUE</option>
           </select>
           <button type="button" id="bulkIssueSaveBtn">SAVE ISSUE</button>
+          <button type="button" id="bulkPassBtn">PASS</button>
           <span class="bulk-selected-count" id="bulkSelectedCount">0 SELECT</span>
         </div>
         <div class="pager-actions">
@@ -2234,6 +2240,7 @@ document.getElementById('galleryColumnsSelect').addEventListener('change', e => 
   applyGalleryColumns();
 });
 document.getElementById('bulkIssueSaveBtn').addEventListener('click', saveBulkIssue);
+document.getElementById('bulkPassBtn').addEventListener('click', saveBulkPass);
 document.addEventListener('pointerup', () => {
   bulkDragActive = false;
 });
@@ -3152,7 +3159,7 @@ function renderStats() {
   const zero = scoped.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length;
   const duplicate = scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length;
   const boxes = scoped.reduce((sum, r) => sum + r.boxes.length, 0);
-  const reviewed = scoped.filter(r => r.status === 'matched' && viewedSet.has(r.id)).length;
+  const reviewed = scoped.filter(r => r.status === 'matched' && reviewedSet.has(r.id) && !issueMap.has(r.id)).length;
   const issueCount = Array.from(issueMap.values()).filter(issue => scopedIds.has(issue.id) && (issue.issues || []).length > 0).length;
   document.getElementById('statImages').textContent = scoped.filter(r => r.imageFile).length;
   document.getElementById('statMatched').textContent = matched;
@@ -3169,7 +3176,7 @@ function renderStats() {
 }
 
 function isReviewed(record) {
-  return viewedSet.has(record.id);
+  return reviewedSet.has(record.id) && !issueMap.has(record.id);
 }
 
 function renderClassControls() {
@@ -3509,7 +3516,24 @@ function saveBulkIssue() {
       missingClass: '',
       note: type ? 'BULK ISSUE' : 'BULK ISSUE CHECK'
     }, false);
+    reviewedSet.delete(record.id);
+  });
+  bulkSelectedIds.clear();
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
+  renderGallery();
+}
+
+function saveBulkPass() {
+  const ids = Array.from(bulkSelectedIds);
+  if (!ids.length) return;
+  ids.forEach(id => {
+    const record = records.find(item => item.id === id);
+    if (!record || record.isVariant) return;
+    issueMap.delete(record.id);
     reviewedSet.add(record.id);
+    saveReviewResult(record, 'approved');
   });
   bulkSelectedIds.clear();
   renderStats();
@@ -3659,7 +3683,7 @@ function selectRecord(index) {
   if (index < 0 || index >= records.length) return;
   cancelMissingArrow(false);
   currentIndex = index;
-  if (records[index]?.status === 'matched') viewedSet.add(records[index].id);
+  if (document.getElementById('viewerPanel')?.classList.contains('viewer-fullscreen') && records[index]?.status === 'matched') viewedSet.add(records[index].id);
   activeBoxIndex = -1;
   issueTarget = null;
   selectedBoxIndices.clear();
@@ -3730,6 +3754,7 @@ function prefetchNeighbors(index) {
 function enterReviewMode() {
   document.getElementById('viewerPanel').classList.add('viewer-fullscreen');
     document.getElementById('fullscreenToggleBtn').textContent = 'CLOSE';
+  if (records[currentIndex]?.status === 'matched') viewedSet.add(records[currentIndex].id);
   document.body.style.overflow = 'hidden';
 }
 
@@ -4079,7 +4104,7 @@ function saveConsistencyIssue() {
     missingClass: '',
     note
   });
-  reviewedSet.add(record.id);
+  reviewedSet.delete(record.id);
   renderStats();
   renderIssuesList();
   updateGalleryHighlights();
@@ -4320,7 +4345,7 @@ async function saveMissingArrowIssue(arrows) {
     arrows,
     imageData
   });
-  reviewedSet.add(record.id);
+  reviewedSet.delete(record.id);
   saveReviewResult(record, actionFromIssue(getRecordIssue(record)) || 'issue', getRecordIssue(record));
   renderStats();
   renderIssuesList();
@@ -4618,7 +4643,7 @@ function saveIssueType(type) {
     missingClass: '',
     note: ''
   });
-  reviewedSet.add(record.id);
+  reviewedSet.delete(record.id);
   saveReviewResult(record, actionFromIssue(getRecordIssue(record)) || 'issue', getRecordIssue(record));
   renderStats();
   renderIssuesList();
