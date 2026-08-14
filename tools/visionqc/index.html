@@ -2430,7 +2430,42 @@ function applyClassEditor() {
   closeClassEditor();
 }
 
+function clearLoadedReviewState() {
+  records = [];
+  issueMap.clear();
+  reviewedSet.clear();
+  bulkSelectedIds.clear();
+  reviewQueue = [];
+  reviewPos = -1;
+  currentIndex = -1;
+  activeBoxIndex = -1;
+  issueTarget = null;
+  selectedBoxIndices.clear();
+  cancelMissingArrow(false);
+  feedbackSlides = [];
+  feedbackActive = null;
+  feedbackDraft = null;
+  feedbackMoveDraft = null;
+  excelFilterNames = new Set();
+  sampleMode = 'all';
+  sampleIds = new Set();
+  galleryPage = 0;
+  galleryThumbMap.clear();
+  mainImageCache = new Map();
+  thumbBitmapCache = new Map();
+  document.getElementById('searchInput').value = '';
+  document.getElementById('sampleModeSelect').value = 'all';
+  excelFilterInput.value = '';
+  renderStats();
+  renderGallery();
+  renderIssuesList();
+  updateToolbarStatus();
+  document.getElementById('mainCanvas').width = 1;
+  document.getElementById('mainCanvas').height = 1;
+}
+
 function handleImages(files) {
+  clearLoadedReviewState();
   const all = Array.from(files).filter(f => /\.(jpg|jpeg|png)$/i.test(f.name));
   // If the picked folder contains an "output" subfolder (the finalized image
   // set), only match against those instead of every image under the whole
@@ -2444,6 +2479,7 @@ function handleImages(files) {
 }
 
 async function handleLabels(files) {
+  clearLoadedReviewState();
   const all = Array.from(files);
   const jsonFiles = all.filter(f => /\.json$/i.test(f.name));
   annotationMap = new Map();
