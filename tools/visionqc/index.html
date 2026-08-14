@@ -1680,6 +1680,7 @@
           <div class="stat-separator"></div>
           <button class="stat filterable" type="button" data-gallery-filter="issue"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></button>
           <button class="stat filterable" type="button" data-gallery-filter="done"><div class="num ok" id="statReviewed">0</div><div class="label">PASS</div></button>
+          <button class="stat filterable" type="button" data-gallery-filter="remain"><div class="num warn" id="statRemain">0</div><div class="label">REMAIN</div></button>
           <div class="stat"><div class="num" id="statProgress">0%</div><div class="label">RATE</div></div>
         </div>
         <div class="export-actions">
@@ -3161,6 +3162,7 @@ function renderStats() {
   const boxes = scoped.reduce((sum, r) => sum + r.boxes.length, 0);
   const reviewed = scoped.filter(r => r.status === 'matched' && reviewedSet.has(r.id) && !issueMap.has(r.id)).length;
   const issueCount = Array.from(issueMap.values()).filter(issue => scopedIds.has(issue.id) && (issue.issues || []).length > 0).length;
+  const remain = scoped.filter(r => isRemainRecord(r)).length;
   document.getElementById('statImages').textContent = scoped.filter(r => r.imageFile).length;
   document.getElementById('statMatched').textContent = matched;
   document.getElementById('statZero').textContent = zero;
@@ -3168,6 +3170,7 @@ function renderStats() {
   document.getElementById('statBoxes').textContent = boxes;
   document.getElementById('statIssues').textContent = issueCount;
   document.getElementById('statReviewed').textContent = reviewed;
+  document.getElementById('statRemain').textContent = remain;
   document.getElementById('statProgress').textContent = matched ? `${Math.round(reviewed / matched * 100)}%` : '0%';
   document.querySelectorAll('[data-gallery-filter]').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.galleryFilter === galleryFilter);
@@ -3177,6 +3180,10 @@ function renderStats() {
 
 function isReviewed(record) {
   return reviewedSet.has(record.id) && !issueMap.has(record.id);
+}
+
+function isRemainRecord(record) {
+  return record.status === 'matched' && !isDuplicate(record) && record.boxes.length > 0 && !issueMap.has(record.id) && !isReviewed(record);
 }
 
 function renderClassControls() {
@@ -3299,6 +3306,7 @@ function filteredRecords() {
       if (f === 'issue' && !issueMap.has(r.id)) return false;
       if (f === 'unreviewed' && isReviewed(r)) return false;
       if (f === 'done' && !isReviewed(r)) return false;
+      if (f === 'remain' && !isRemainRecord(r)) return false;
     }
     const imagePath = r.imageFile ? filePath(r.imageFile) : '';
     const haystack = [r.baseName, r.imageFile?.name || '', r.labelFile?.name || '', imagePath.split(/[\\/]/).pop() || '']
@@ -3540,6 +3548,20 @@ function saveBulkPass() {
   renderIssuesList();
   updateGalleryHighlights();
   renderGallery();
+}
+
+function saveCurrentPass() {
+  const record = records[currentIndex];
+  if (!record || record.isVariant) return;
+  issueMap.delete(record.id);
+  reviewedSet.add(record.id);
+  saveReviewResult(record, 'approved');
+  resetIssueDraft();
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
+  hideIssuePopup();
+  renderCurrent();
 }
 
 function updateGalleryPager(total, visible, totalPages) {
@@ -3788,7 +3810,7 @@ document.addEventListener('keydown', (e) => {
   const tag = document.activeElement ? document.activeElement.tagName : '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   const key = e.key.toLowerCase();
-  if (/^[1-6]$/.test(key)) {
+  if (/^[1-7]$/.test(key)) {
     e.preventDefault();
     handleIssueShortcut(Number(key));
     return;
@@ -4554,6 +4576,9 @@ function buildIssueChecks() {
       ${issueButtonHtml('consis', 'Consis', 5)}
       <button type="button" class="check" id="commentToggleBtn" onclick="toggleCommentField(true)"><span class="issue-num">6</span> Comment</button>
     </div>
+    <div class="issue-column">
+      <button type="button" class="check" onclick="saveCurrentPass()"><span class="issue-num">7</span> Pass</button>
+    </div>
   `;
   renderIssuePopover();
 }
@@ -4596,6 +4621,9 @@ function renderIssuePopover() {
     <div class="issue-column">
       <button type="button" class="check" onclick="saveIssueType('consis')"><span class="issue-num">5</span> Consis</button>
       <button type="button" class="check" onclick="toggleCommentField(true)"><span class="issue-num">6</span> Comment</button>
+    </div>
+    <div class="issue-column">
+      <button type="button" class="check" onclick="saveCurrentPass()"><span class="issue-num">7</span> Pass</button>
     </div>
   `;
 }
@@ -4663,6 +4691,10 @@ function handleIssueShortcut(number) {
   };
   if (number === 6) {
     toggleCommentField(true);
+    return;
+  }
+  if (number === 7) {
+    saveCurrentPass();
     return;
   }
   if (shortcuts[number]) saveIssueType(shortcuts[number]);
