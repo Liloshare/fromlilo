@@ -29,13 +29,15 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
       color: var(--text);
       background: var(--bg);
-      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
     }
 
     .app {
       display: grid;
       grid-template-rows: auto 1fr;
-      min-height: 100vh;
+      height: 100vh;
+      min-height: 0;
     }
 
     header {
@@ -71,7 +73,9 @@
       grid-template-columns: 320px 1fr;
       gap: 12px;
       padding: 12px;
+      height: 100%;
       min-height: 0;
+      overflow: hidden;
     }
 
     .panel {
@@ -101,6 +105,13 @@
       padding: 14px;
       overflow: auto;
       max-height: calc(100vh - 70px);
+    }
+
+    .gallery-panel {
+      display: grid;
+      grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .stack { display: grid; gap: 12px; }
@@ -258,7 +269,6 @@
     .gallery-wrap {
       min-height: 0;
       overflow: auto;
-      height: calc(100vh - 126px);
       padding: 12px;
     }
 
@@ -330,6 +340,9 @@
     .thumb.issue {
       border-color: var(--danger);
       box-shadow: 0 0 0 2px rgba(209,99,125,.18), 0 8px 18px rgba(209,99,125,.16);
+    }
+    .thumb.issue canvas {
+      opacity: .52;
     }
     .thumb.bulk-selected {
       border-color: var(--accent);
@@ -1295,6 +1308,8 @@
     .hidden { display: none !important; }
 
     @media (max-width: 1100px) {
+      body { height: auto; overflow: auto; }
+      .app { height: auto; }
       .layout { grid-template-columns: 1fr; }
       .panel-body { max-height: none; }
       .gallery-wrap { height: auto; }
@@ -1671,7 +1686,7 @@
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel gallery-panel">
       <div class="toolbar">
         <input id="searchInput" type="text" placeholder="SEARCH FILE NAME">
         <button class="file-filter-btn" id="excelFilterBtn" type="button">XLSX</button>
@@ -1973,6 +1988,7 @@ let records = [];
 let currentIndex = -1;
 let issueMap = new Map();
 let reviewedSet = new Set();
+let viewedSet = new Set();
 let objectUrlCache = new Map();
 let activeBoxIndex = -1;
 let issueTarget = null;
@@ -2434,6 +2450,7 @@ function clearLoadedReviewState() {
   records = [];
   issueMap.clear();
   reviewedSet.clear();
+  viewedSet.clear();
   bulkSelectedIds.clear();
   reviewQueue = [];
   reviewPos = -1;
@@ -2840,6 +2857,7 @@ async function runValidation() {
   records = [];
   issueMap.clear();
   reviewedSet.clear();
+  viewedSet.clear();
   bulkSelectedIds.clear();
   reviewQueue = [];
   reviewPos = -1;
@@ -3134,10 +3152,8 @@ function renderStats() {
   const zero = scoped.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length;
   const duplicate = scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length;
   const boxes = scoped.reduce((sum, r) => sum + r.boxes.length, 0);
-  const reviewed = scoped.filter(r => r.status === 'matched' && (reviewedSet.has(r.id) || issueMap.has(r.id))).length;
-  const issueCount = Array.from(issueMap.values())
-    .filter(issue => scopedIds.has(issue.id))
-    .reduce((sum, issue) => sum + (issue.issues?.length || (issue.types?.length ? 1 : 0)), 0);
+  const reviewed = scoped.filter(r => r.status === 'matched' && viewedSet.has(r.id)).length;
+  const issueCount = Array.from(issueMap.values()).filter(issue => scopedIds.has(issue.id) && (issue.issues || []).length > 0).length;
   document.getElementById('statImages').textContent = scoped.filter(r => r.imageFile).length;
   document.getElementById('statMatched').textContent = matched;
   document.getElementById('statZero').textContent = zero;
@@ -3153,7 +3169,7 @@ function renderStats() {
 }
 
 function isReviewed(record) {
-  return reviewedSet.has(record.id) || issueMap.has(record.id);
+  return viewedSet.has(record.id);
 }
 
 function renderClassControls() {
@@ -3643,11 +3659,13 @@ function selectRecord(index) {
   if (index < 0 || index >= records.length) return;
   cancelMissingArrow(false);
   currentIndex = index;
+  if (records[index]?.status === 'matched') viewedSet.add(records[index].id);
   activeBoxIndex = -1;
   issueTarget = null;
   selectedBoxIndices.clear();
   loadIssueToForm();
   renderIssuesList();
+  renderStats();
   updateGalleryHighlights();
   updatePosCounter();
   renderCurrent();
@@ -4941,7 +4959,7 @@ async function renderConsisIssueImage(record, issue) {
 
 function buildSummaryRows() {
   const scoped = scopedRecords();
-  const viewed = scoped.filter(record => reviewedSet.has(record.id) || issueMap.has(record.id)).length;
+  const viewed = scoped.filter(record => viewedSet.has(record.id)).length;
   const issueCount = Array.from(issueMap.values()).filter(group => (group.issues || []).length > 0).length;
   const totalIssues = Array.from(issueMap.values()).reduce((sum, group) => sum + (group.issues || []).length, 0);
   return [
@@ -5786,6 +5804,7 @@ function resetAll() {
   selectedBoxIndices.clear();
   issueMap.clear();
   reviewedSet.clear();
+  viewedSet.clear();
   imageInput.value = '';
   labelInput.value = '';
   excelFilterInput.value = '';
