@@ -4060,9 +4060,10 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
   ctx.save();
   const scaleX = canvasW / imgW;
   const scaleY = canvasH / imgH;
-  const labeledClasses = new Set();
+  const legendClasses = new Set();
   record.boxes.forEach((box, idx) => {
     if (!classSet.has(box.className)) return;
+    legendClasses.add(box.className);
     const color = classColors[box.className] || '#a8a4bd';
     const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
     ctx.globalAlpha = isMain ? 0.08 : 0.14;
@@ -4071,7 +4072,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     if (box.type === 'polygon') ctx.fill();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(0.6, canvasW / 4200), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(1.2, canvasW / 2100), 0, Math.PI * 2);
       ctx.fill();
     }
     else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
@@ -4087,7 +4088,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     if (box.type === 'polygon') ctx.stroke();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(1, canvasW / 3600), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(2, canvasW / 1800), 0, Math.PI * 2);
       ctx.stroke();
     }
     else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
@@ -4100,25 +4101,45 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
       ctx.stroke();
     } else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(1.2, canvasW / 3000), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(2.4, canvasW / 1500), 0, Math.PI * 2);
       ctx.stroke();
     } else {
       ctx.strokeRect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
     }
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
-    const shouldLabel = !labeledClasses.has(box.className);
-    if (shouldLabel && (isMain || canvasW > 300)) {
-      labeledClasses.add(box.className);
-      const label = box.className;
-      ctx.font = `${Math.max(10, Math.round(canvasW / 72))}px "Courier New", monospace`;
-      const tw = ctx.measureText(label).width;
-      const th = Math.max(14, Math.round(canvasW / 58));
-      ctx.fillStyle = color;
-      ctx.fillRect(rect.x, Math.max(0, rect.y - th), tw + 10, th);
-      ctx.fillStyle = '#050505';
-      ctx.fillText(label, rect.x + 5, Math.max(12, rect.y - 5));
-    }
+  });
+  if (isMain) drawOverlayLegend(ctx, record, Array.from(legendClasses), canvasW);
+  ctx.restore();
+}
+
+function drawOverlayLegend(ctx, record, classNames, canvasW) {
+  if (!classNames.length) return;
+  const selectedIdx = Array.from(selectedBoxIndices)[0] ?? activeBoxIndex;
+  const selected = record === records[currentIndex] ? record.boxes[selectedIdx] : null;
+  const lines = classNames.slice(0, 12).map(name => ({ name, color: classColors[name] || '#a8a4bd' }));
+  if (classNames.length > lines.length) lines.push({ name: `+${classNames.length - lines.length}`, color: '#ffffff' });
+  if (selected?.type === 'keypoint') {
+    const selectedText = [selected.rawLabel || selected.className, selected.score !== '' && selected.score !== undefined ? `score ${formatScore(selected.score)}` : ''].filter(Boolean).join(' / ');
+    lines.push({ name: selectedText, color: '#ffffff', selected: true });
+  }
+  const fontSize = Math.max(10, Math.round(canvasW / 118));
+  const lineH = fontSize + 7;
+  const pad = 8;
+  ctx.save();
+  ctx.font = `${fontSize}px "Courier New", monospace`;
+  const width = Math.min(canvasW - 16, Math.max(...lines.map(line => ctx.measureText(line.name).width)) + 34);
+  const height = pad * 2 + lines.length * lineH;
+  ctx.globalAlpha = 0.82;
+  ctx.fillStyle = '#050505';
+  ctx.fillRect(8, 8, width, height);
+  ctx.globalAlpha = 1;
+  lines.forEach((line, idx) => {
+    const y = 8 + pad + idx * lineH + fontSize;
+    ctx.fillStyle = line.color;
+    ctx.fillRect(16, y - fontSize + 2, 10, 10);
+    ctx.fillStyle = line.selected ? '#ffffff' : '#f5f7ff';
+    ctx.fillText(line.name, 32, y);
   });
   ctx.restore();
 }
@@ -4585,7 +4606,7 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     if (box.type === 'polygon') ctx.stroke();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 1.2, 0, Math.PI * 2);
+      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 2.4, 0, Math.PI * 2);
       ctx.stroke();
     }
     else {
@@ -4601,7 +4622,7 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
       ctx.stroke();
     } else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 1.6, 0, Math.PI * 2);
+      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 3.2, 0, Math.PI * 2);
       ctx.stroke();
     } else {
       const rect = lensShapeRect(box, sx, sy, imgW, imgH, scaleX, scaleY);
