@@ -2615,9 +2615,11 @@ async function buildArrowKeypointAnnotationMap(files) {
         (ann.points || []).forEach((point, pointIdx) => {
           const shape = makeKeypointShape(className, point, annIdx + 1, imgW, imgH);
           if (!shape) return;
+          const pointScore = Array.isArray(point) ? null : point?.score;
           shape.rawLabel = rawLabel;
           shape.trackId = ann.track_id ?? ann.trackId ?? '';
           shape.visibility = ann.visibility ?? '';
+          shape.score = firstDefined(pointScore, nestedValue(ann, ['score']), nestedValue(ann, ['attributes', 'score']), nestedValue(ann, ['meta', 'score']), nestedValue(ann, ['properties', 'score']));
           shape.arrowId = parsed.arrowId;
           shape.part = parsed.part;
           shape.pointIndex = pointIdx + 1;
@@ -2641,6 +2643,14 @@ function parseArrowKeypointLabel(label) {
     part,
     invisible: /_invi_/i.test(text)
   };
+}
+
+function firstDefined(...values) {
+  return values.find(value => value !== undefined && value !== null && value !== '');
+}
+
+function nestedValue(source, path) {
+  return path.reduce((value, key) => value && typeof value === 'object' ? value[key] : undefined, source);
 }
 
 function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
@@ -2731,7 +2741,9 @@ function rectangleToShape(className, points, row, imgW, imgH) {
 }
 
 function makeKeypointShape(className, point, row, imgW, imgH) {
-  const [x, y] = point || [];
+  const [x, y] = Array.isArray(point)
+    ? point
+    : [point?.x ?? point?.X ?? point?.[0], point?.y ?? point?.Y ?? point?.[1]];
   const px = Number(x), py = Number(y);
   if (![px, py].every(Number.isFinite) || !imgW || !imgH) return null;
   return { type: 'keypoint', className, classId: classes.indexOf(className), xc: px / imgW, yc: py / imgH, bw: 0.012, bh: 0.012, points: [{ x: px / imgW, y: py / imgH }], row };
@@ -3959,10 +3971,18 @@ function objectMetaSummary(items) {
   if (!items.some(item => item.type === 'keypoint')) return '';
   const tracks = Array.from(new Set(items.map(item => item.trackId).filter(value => value !== '' && value !== null && value !== undefined)));
   const vis = Array.from(new Set(items.map(item => item.visibility).filter(value => value !== '' && value !== null && value !== undefined)));
+  const scores = Array.from(new Set(items.map(item => formatScore(item.score)).filter(Boolean)));
   return [
     tracks.length ? `track ${tracks.slice(0, 4).join(',')}${tracks.length > 4 ? '+' : ''}` : '',
-    vis.length ? `vis ${vis.slice(0, 4).join(',')}${vis.length > 4 ? '+' : ''}` : ''
+    vis.length ? `vis ${vis.slice(0, 4).join(',')}${vis.length > 4 ? '+' : ''}` : '',
+    scores.length ? `score ${scores.slice(0, 4).join(',')}${scores.length > 4 ? '+' : ''}` : ''
   ].filter(Boolean).join(' / ');
+}
+
+function formatScore(value) {
+  if (value === '' || value === null || value === undefined) return '';
+  const num = Number(value);
+  return Number.isFinite(num) ? String(Math.round(num * 1000) / 1000) : String(value);
 }
 
 async function renderCanvas(canvas, record, maxWidth, isMain = false) {
