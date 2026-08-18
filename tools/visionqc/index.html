@@ -459,7 +459,8 @@
       border-radius: var(--radius);
       overflow: auto;
       background: var(--dark);
-      max-height: 52vh;
+      max-height: calc(100vh - 142px);
+      min-height: min(72vh, 760px);
       display: grid;
       place-items: safe center;
       position: relative;
@@ -595,6 +596,7 @@
     @media (max-width: 900px) {
       .panel.viewer-fullscreen .viewer { grid-template-columns: 1fr; grid-template-rows: 1fr auto; overflow: auto; }
       .panel.viewer-fullscreen .canvas-frame { max-height: 46vh; }
+      .canvas-frame { min-height: 52vh; max-height: 62vh; }
     }
 
     .loading-overlay {
@@ -3908,7 +3910,7 @@ async function renderCurrent() {
     document.getElementById('metaTable').innerHTML = '<div class="meta-row"><div class="meta-key">FILE</div><div class="meta-val">EMPTY</div></div>';
     return;
   }
-  await renderCanvas(canvas, record, 1200, true);
+  await renderCanvas(canvas, record, mainCanvasMaxWidth(), true);
   magnifierImg = record.imageFile ? await loadImage(record.imageFile) : null;
   renderMeta(record);
   if (boxSummary) boxSummary.textContent = `(${record.boxes.length})`;
@@ -3935,11 +3937,11 @@ async function renderCurrent() {
       btn.classList.toggle('active', selectedBoxIndices.has(idx));
       btn.addEventListener('mouseenter', () => {
         activeBoxIndex = idx;
-        renderCanvas(document.getElementById('mainCanvas'), record, 1200, true);
+        renderCanvas(document.getElementById('mainCanvas'), record, mainCanvasMaxWidth(), true);
       });
       btn.addEventListener('mouseleave', () => {
         activeBoxIndex = -1;
-        renderCanvas(document.getElementById('mainCanvas'), record, 1200, true);
+        renderCanvas(document.getElementById('mainCanvas'), record, mainCanvasMaxWidth(), true);
       });
       btn.addEventListener('click', () => {
         if (selectedBoxIndices.has(idx)) selectedBoxIndices.delete(idx);
@@ -3960,6 +3962,12 @@ async function renderCurrent() {
     }
     boxList.appendChild(row);
   });
+}
+
+function mainCanvasMaxWidth() {
+  const frame = document.getElementById('canvasFrame');
+  const frameWidth = frame?.clientWidth || 1200;
+  return Math.max(1200, Math.floor(frameWidth - 24));
 }
 
 function objectTypeSummary(items) {
@@ -4063,7 +4071,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     if (box.type === 'polygon') ctx.fill();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(2, canvasW / 420), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(0.6, canvasW / 4200), 0, Math.PI * 2);
       ctx.fill();
     }
     else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
@@ -4079,7 +4087,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     if (box.type === 'polygon') ctx.stroke();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(3, canvasW / 360), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(1, canvasW / 3600), 0, Math.PI * 2);
       ctx.stroke();
     }
     else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
@@ -4092,7 +4100,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
       ctx.stroke();
     } else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(4, canvasW / 300), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(1.2, canvasW / 3000), 0, Math.PI * 2);
       ctx.stroke();
     } else {
       ctx.strokeRect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
@@ -4438,7 +4446,7 @@ async function previewMissingArrow(e) {
   missingArrowDraft.y2 = point.y;
   const record = records[currentIndex];
   if (!record) return;
-  await renderCanvas(canvas, record, 1200, true);
+  await renderCanvas(canvas, record, mainCanvasMaxWidth(), true);
   drawFeedbackShape(canvas.getContext('2d'), missingArrowDraft, canvas.width, canvas.height, true);
 }
 
@@ -4508,7 +4516,7 @@ function renderMissingArrowControls(show) {
 
 async function renderMissingIssueImage(record, arrows) {
   const canvas = document.createElement('canvas');
-  await renderCanvas(canvas, record, 1200, true);
+  await renderCanvas(canvas, record, mainCanvasMaxWidth(), true);
   arrows.forEach(arrow => drawFeedbackShape(canvas.getContext('2d'), arrow, canvas.width, canvas.height, false));
   return canvas.toDataURL('image/png');
 }
@@ -4577,7 +4585,7 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     if (box.type === 'polygon') ctx.stroke();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 4, 0, Math.PI * 2);
+      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 1.2, 0, Math.PI * 2);
       ctx.stroke();
     }
     else {
@@ -4593,7 +4601,7 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
       ctx.stroke();
     } else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 5, 0, Math.PI * 2);
+      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 1.6, 0, Math.PI * 2);
       ctx.stroke();
     } else {
       const rect = lensShapeRect(box, sx, sy, imgW, imgH, scaleX, scaleY);
