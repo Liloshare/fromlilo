@@ -1634,7 +1634,7 @@
           <label>LABEL</label>
           <div class="drop" id="labelDrop">
             <strong>SELECT LABEL</strong>
-            <span>YOLO TXT / COCO JSON / LABELME JSON</span>
+            <span>YOLO TXT / COCO JSON / LABELME JSON / KEYPOINT JSON</span>
           </div>
           <input id="labelInput" type="file" webkitdirectory multiple>
         </div>
@@ -2276,6 +2276,10 @@ function normalizedStem(name) {
   return name.replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, '').normalize('NFC').toLowerCase();
 }
 
+function normalizedAnnotationKey(name) {
+  return String(name || '').replace(/\.[^/.]+$/, '').trim().normalize('NFC').toLowerCase();
+}
+
 function normalizedFileToken(value) {
   return String(value || '').replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, '').trim().normalize('NFC').toLowerCase();
 }
@@ -2297,6 +2301,9 @@ function imageMatchesAnnotationKey(file, annotationKey) {
   const pathToken = compactMatchToken(filePath(file));
   const nameToken = compactMatchToken(file.name);
   if (!annotationToken || !nameToken) return false;
+  if (/[\\/]/.test(String(annotationKey || ''))) {
+    return pathToken.includes(annotationToken) || annotationToken.includes(pathToken);
+  }
   return annotationToken.includes(nameToken) || pathToken.includes(annotationToken) || annotationToken.includes(pathToken);
 }
 
@@ -2534,6 +2541,14 @@ async function handleLabels(files) {
 async function handleJsonAnnotations(jsonFiles) {
   labelFiles = jsonFiles;
   const first = JSON.parse(await jsonFiles[0].text());
+  if (isArrowKeypointJson(first)) {
+    annotationFormat = 'arrowkp';
+    await buildArrowKeypointAnnotationMap(jsonFiles);
+    labelDrop.classList.add('loaded');
+    labelDrop.querySelector('strong').textContent = `KEYPOINT ${annotationMap.size}`;
+    labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON`;
+    return;
+  }
   if (Array.isArray(first.images) && Array.isArray(first.annotations)) {
     annotationFormat = 'coco';
     await buildCocoAnnotationMap(jsonFiles);
@@ -2548,6 +2563,11 @@ async function handleJsonAnnotations(jsonFiles) {
   labelDrop.classList.add('loaded');
   labelDrop.querySelector('strong').textContent = `LABELME ${annotationMap.size}`;
   labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON`;
+}
+
+function isArrowKeypointJson(data) {
+  const images = Array.isArray(data?.images) ? data.images : Array.isArray(data) ? data : [];
+  return images.some(image => Array.isArray(image?.annotations) && image.annotations.some(ann => Array.isArray(ann?.points)));
 }
 
 async function buildCocoAnnotationMap(files) {
@@ -2574,6 +2594,53 @@ async function buildCocoAnnotationMap(files) {
   }
   setAnnotationClasses(classNames);
   annotationMap = grouped;
+}
+
+async function buildArrowKeypointAnnotationMap(files) {
+  const grouped = new Map();
+  const classNames = [];
+  for (const file of files) {
+    const data = JSON.parse(await file.text());
+    const images = Array.isArray(data?.images) ? data.images : Array.isArray(data) ? data : [];
+    images.forEach((image, imageIdx) => {
+      const fileName = String(image.file_name || image.fileName || image.filename || `image_${image.image_id || imageIdx + 1}`);
+      const key = normalizedAnnotationKey(fileName);
+      const imgW = Number(image.width) || null;
+      const imgH = Number(image.height) || null;
+      const boxes = [];
+      (image.annotations || []).forEach((ann, annIdx) => {
+        const rawLabel = String(ann.label || ann.name || `Keypoint_${annIdx + 1}`);
+        const parsed = parseArrowKeypointLabel(rawLabel);
+        const className = parsed.part ? `${parsed.invisible ? 'invi_' : ''}${parsed.part}` : rawLabel;
+        (ann.points || []).forEach((point, pointIdx) => {
+          const shape = makeKeypointShape(className, point, annIdx + 1, imgW, imgH);
+          if (!shape) return;
+          shape.rawLabel = rawLabel;
+          shape.trackId = ann.track_id ?? ann.trackId ?? '';
+          shape.visibility = ann.visibility ?? '';
+          shape.arrowId = parsed.arrowId;
+          shape.part = parsed.part;
+          shape.pointIndex = pointIdx + 1;
+          boxes.push(shape);
+          classNames.push(className);
+        });
+      });
+      if (key) grouped.set(key, { file, image: { file_name: fileName, width: imgW, height: imgH }, boxes });
+    });
+  }
+  setAnnotationClasses(classNames);
+  annotationMap = grouped;
+}
+
+function parseArrowKeypointLabel(label) {
+  const text = String(label || '');
+  const match = text.match(/^Arrow_(\d+)(?:_invi)?_(Tip|Body|Tail)(?:_.+)?$/i);
+  const part = match ? match[2].charAt(0).toUpperCase() + match[2].slice(1).toLowerCase() : '';
+  return {
+    arrowId: match ? match[1] : '',
+    part,
+    invisible: /_invi_/i.test(text)
+  };
 }
 
 function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
@@ -3847,7 +3914,8 @@ async function renderCurrent() {
     row.className = 'box-row';
     row.title = className;
     const typeSummary = objectTypeSummary(items.map(item => item.box));
-    row.innerHTML = `<span class="swatch" style="background:${classColors[className] || '#a8a4bd'}"></span><span class="box-class-once">${escapeHtml(className)}</span><span class="box-kind">${escapeHtml(typeSummary)}</span><div class="btn-row"></div>`;
+    const metaSummary = objectMetaSummary(items.map(item => item.box));
+    row.innerHTML = `<span class="swatch" style="background:${classColors[className] || '#a8a4bd'}"></span><span class="box-class-once">${escapeHtml(className)}</span><span class="box-kind">${escapeHtml([typeSummary, metaSummary].filter(Boolean).join(' / '))}</span><div class="btn-row"></div>`;
     const actions = row.querySelector('.btn-row');
     items.forEach(({ idx }) => {
       const btn = document.createElement('button');
@@ -3885,6 +3953,16 @@ function objectTypeSummary(items) {
     return acc;
   }, {});
   return Object.entries(counts).map(([type, count]) => `${type} ${count}`).join(' / ');
+}
+
+function objectMetaSummary(items) {
+  if (!items.some(item => item.type === 'keypoint')) return '';
+  const tracks = Array.from(new Set(items.map(item => item.trackId).filter(value => value !== '' && value !== null && value !== undefined)));
+  const vis = Array.from(new Set(items.map(item => item.visibility).filter(value => value !== '' && value !== null && value !== undefined)));
+  return [
+    tracks.length ? `track ${tracks.slice(0, 4).join(',')}${tracks.length > 4 ? '+' : ''}` : '',
+    vis.length ? `vis ${vis.slice(0, 4).join(',')}${vis.length > 4 ? '+' : ''}` : ''
+  ].filter(Boolean).join(' / ');
 }
 
 async function renderCanvas(canvas, record, maxWidth, isMain = false) {
@@ -5873,7 +5951,7 @@ function resetAll() {
   imageDrop.querySelector('strong').textContent = 'SELECT IMAGE';
   imageDrop.querySelector('span').textContent = 'JPG / JPEG / PNG';
   labelDrop.querySelector('strong').textContent = 'SELECT LABEL';
-  labelDrop.querySelector('span').textContent = 'YOLO TXT / COCO JSON / LABELME JSON';
+  labelDrop.querySelector('span').textContent = 'YOLO TXT / COCO JSON / LABELME JSON / KEYPOINT JSON';
   document.getElementById('classInput').value = '';
   runBtn.disabled = true;
   document.getElementById('csvBtn').disabled = true;
