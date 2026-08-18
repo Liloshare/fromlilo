@@ -4656,11 +4656,15 @@ function drawLensShape(ctx, shape, sx, sy, imgW, imgH, scaleX, scaleY) {
 initMagnifier();
 
 function renderMeta(record) {
+  const sourcePath = record.imageFile ? filePath(record.imageFile) : record.labelFile ? filePath(record.labelFile) : '';
+  const annotationPath = record.id && /[\\/]/.test(record.id) ? record.id : '';
+  const displayPath = sourcePath && sourcePath !== record.imageFile?.name ? sourcePath : annotationPath || sourcePath || record.baseName;
   const rows = [
     ['NO', record.order ? `${record.order} / ${reviewableTotal}` : '-'],
+    ['PATH', displayPath],
     ['FILE', record.baseName],
     ['SIZE', record.imageSize ? `${record.imageSize.width} x ${record.imageSize.height}` : '-']
-  ].map(([k, v]) => `<div class="meta-row"><div class="meta-key">${k}</div><div class="meta-val">${escapeHtml(v)}</div>${k === 'FILE' ? `<button class="meta-copy" type="button" data-copy="${escapeHtml(v)}">COPY</button>` : '<span></span>'}</div>`).join('');
+  ].map(([k, v]) => `<div class="meta-row"><div class="meta-key">${k}</div><div class="meta-val">${escapeHtml(v)}</div>${k === 'FILE' || k === 'PATH' ? `<button class="meta-copy" type="button" data-copy="${escapeHtml(v)}">COPY</button>` : '<span></span>'}</div>`).join('');
 
   let dupRow = '';
   if (isDuplicate(record)) {
