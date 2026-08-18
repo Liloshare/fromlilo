@@ -4039,7 +4039,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     if (box.type === 'polygon') ctx.fill();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(4, canvasW / 180), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(2, canvasW / 420), 0, Math.PI * 2);
       ctx.fill();
     }
     else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
@@ -4055,7 +4055,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     if (box.type === 'polygon') ctx.stroke();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(5, canvasW / 160), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(3, canvasW / 360), 0, Math.PI * 2);
       ctx.stroke();
     }
     else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
@@ -4068,7 +4068,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
       ctx.stroke();
     } else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(7, canvasW / 140), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(4, canvasW / 300), 0, Math.PI * 2);
       ctx.stroke();
     } else {
       ctx.strokeRect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
@@ -4553,7 +4553,7 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     if (box.type === 'polygon') ctx.stroke();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 8, 0, Math.PI * 2);
+      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 4, 0, Math.PI * 2);
       ctx.stroke();
     }
     else {
@@ -4569,7 +4569,7 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
       ctx.stroke();
     } else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 10, 0, Math.PI * 2);
+      ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 5, 0, Math.PI * 2);
       ctx.stroke();
     } else {
       const rect = lensShapeRect(box, sx, sy, imgW, imgH, scaleX, scaleY);
