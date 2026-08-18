@@ -4024,13 +4024,13 @@ function updateReviewToolMode() {
   if (isSelect) document.getElementById('magnifier')?.classList.add('hidden');
 }
 
-function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain) {
+function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet = visibleClasses) {
   ctx.save();
   const scaleX = canvasW / imgW;
   const scaleY = canvasH / imgH;
   const labeledClasses = new Set();
   record.boxes.forEach((box, idx) => {
-    if (!visibleClasses.has(box.className)) return;
+    if (!classSet.has(box.className)) return;
     const color = classColors[box.className] || '#a8a4bd';
     const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
     ctx.globalAlpha = isMain ? 0.08 : 0.14;
@@ -4124,10 +4124,10 @@ function drawShapePath(ctx, shape, imgW, imgH, scaleX, scaleY) {
 }
 
 function drawClassBoxes(ctx, record, className, canvasW, canvasH, imgW, imgH) {
-  const previousVisibleClasses = visibleClasses;
-  visibleClasses = className === '__all__' ? new Set(record.boxes.map(box => box.className)) : new Set([className]);
-  drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, false);
-  visibleClasses = previousVisibleClasses;
+  const classSet = className === '__all__'
+    ? new Set(record.boxes.map(box => box.className))
+    : new Set([className]);
+  drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, false, classSet);
 }
 
 function consistencySourceRows() {
