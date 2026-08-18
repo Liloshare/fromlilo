@@ -2615,11 +2615,10 @@ async function buildArrowKeypointAnnotationMap(files) {
         (ann.points || []).forEach((point, pointIdx) => {
           const shape = makeKeypointShape(className, point, annIdx + 1, imgW, imgH);
           if (!shape) return;
-          const pointScore = Array.isArray(point) ? null : point?.score;
           shape.rawLabel = rawLabel;
           shape.trackId = ann.track_id ?? ann.trackId ?? '';
           shape.visibility = ann.visibility ?? '';
-          shape.score = firstDefined(pointScore, nestedValue(ann, ['score']), nestedValue(ann, ['attributes', 'score']), nestedValue(ann, ['meta', 'score']), nestedValue(ann, ['properties', 'score']));
+          shape.score = readKeypointScore(ann, point);
           shape.arrowId = parsed.arrowId;
           shape.part = parsed.part;
           shape.pointIndex = pointIdx + 1;
@@ -2645,12 +2644,9 @@ function parseArrowKeypointLabel(label) {
   };
 }
 
-function firstDefined(...values) {
-  return values.find(value => value !== undefined && value !== null && value !== '');
-}
-
-function nestedValue(source, path) {
-  return path.reduce((value, key) => value && typeof value === 'object' ? value[key] : undefined, source);
+function readKeypointScore(ann, point) {
+  const pointScore = Array.isArray(point) ? point[2]?.score ?? point[2] : point?.score;
+  return pointScore ?? ann.score ?? ann.attributes?.score ?? ann.meta?.score ?? ann.properties?.score ?? '';
 }
 
 function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
@@ -3266,8 +3262,9 @@ function isRemainRecord(record) {
 }
 
 function renderClassControls() {
-  const all = Array.from(new Set(classes));
-  records.forEach(r => r.boxes.forEach(b => all.includes(b.className) || all.push(b.className)));
+  const allSet = new Set(classes);
+  records.forEach(r => r.boxes.forEach(b => allSet.add(b.className)));
+  const all = Array.from(allSet);
   all.forEach((name, idx) => {
     if (!classColors[name]) classColors[name] = DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
     if (!classLineWidths[name]) classLineWidths[name] = 2;
@@ -3929,7 +3926,8 @@ async function renderCurrent() {
     const metaSummary = objectMetaSummary(items.map(item => item.box));
     row.innerHTML = `<span class="swatch" style="background:${classColors[className] || '#a8a4bd'}"></span><span class="box-class-once">${escapeHtml(className)}</span><span class="box-kind">${escapeHtml([typeSummary, metaSummary].filter(Boolean).join(' / '))}</span><div class="btn-row"></div>`;
     const actions = row.querySelector('.btn-row');
-    items.forEach(({ idx }) => {
+    const buttonItems = items.slice(0, 160);
+    buttonItems.forEach(({ idx }) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = String(idx + 1);
@@ -3954,6 +3952,12 @@ async function renderCurrent() {
       });
       actions.appendChild(btn);
     });
+    if (items.length > buttonItems.length) {
+      const more = document.createElement('span');
+      more.className = 'hint';
+      more.textContent = `+${items.length - buttonItems.length}`;
+      actions.appendChild(more);
+    }
     boxList.appendChild(row);
   });
 }
