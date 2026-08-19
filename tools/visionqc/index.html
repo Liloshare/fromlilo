@@ -2340,6 +2340,15 @@ function imagesForKey(key) {
   return imageFiles.filter(file => imageMatchesAnnotationKey(file, key));
 }
 
+function annotationKeyForImageFile(file) {
+  const imageKey = normalizedFilePathStem(file);
+  if (annotationMap.has(imageKey)) return imageKey;
+  for (const key of annotationMap.keys()) {
+    if (imageMatchesAnnotationKey(file, key)) return key;
+  }
+  return '';
+}
+
 function setAnnotationClasses(names) {
   const next = Array.from(new Set(names.map(name => String(name || '').trim()).filter(Boolean)));
   if (!next.length) return;
@@ -3012,6 +3021,9 @@ async function runValidation() {
   for (const key of sortedKeys) {
     const images = imagesForKey(key);
     const labels = labelMap.get(key) || [];
+    const annotationKey = annotationFormat !== 'yolo'
+      ? (annotationMap.has(key) ? key : (images[0] ? annotationKeyForImageFile(images[0]) : ''))
+      : '';
     const status = images.length && labels.length ? 'matched' : images.length ? 'missing-label' : 'missing-image';
     records.push({
       id: key,
@@ -3025,6 +3037,7 @@ async function runValidation() {
       status,
       boxes: [],
       labelVariants: null,
+      annotationKey,
       parseError: '',
       imageSize: null
     });
@@ -3236,7 +3249,7 @@ async function parseBoxesFromFile(file) {
 
 async function parseRecord(record) {
   if (annotationFormat !== 'yolo') {
-    const entry = annotationMap.get(record.id);
+    const entry = annotationMap.get(record.annotationKey || record.id);
     if (!entry) return;
     record.boxes = entry.boxes || [];
     record.labelFile = entry.file || record.labelFile;
