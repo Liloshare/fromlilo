@@ -2282,6 +2282,10 @@ function normalizedAnnotationKey(name) {
   return String(name || '').replace(/\.[^/.]+$/, '').trim().normalize('NFC').toLowerCase();
 }
 
+function normalizedFilePathStem(file) {
+  return normalizedAnnotationKey(filePath(file));
+}
+
 function normalizedFileToken(value) {
   return String(value || '').replace(/^.*[\\/]/, '').replace(/\.[^/.]+$/, '').trim().normalize('NFC').toLowerCase();
 }
@@ -2311,7 +2315,17 @@ function imageMatchesAnnotationKey(file, annotationKey) {
 
 function imagesForKey(key) {
   const exact = imageMap.get(key) || [];
-  if (exact.length || annotationFormat === 'yolo') return exact;
+  if (exact.length) return exact;
+  if (annotationFormat === 'yolo') {
+    const stem = normalizedStem(key);
+    const candidates = imageFiles.filter(file => normalizedStem(file.name) === stem);
+    const parent = String(key || '').split(/[\\/]/).slice(-2, -1)[0]?.normalize('NFC').toLowerCase();
+    if (parent && candidates.length > 1) {
+      const sameParent = candidates.filter(file => fileSourceTag(file).normalize('NFC').toLowerCase() === parent);
+      if (sameParent.length) return sameParent;
+    }
+    return candidates;
+  }
   return imageFiles.filter(file => imageMatchesAnnotationKey(file, key));
 }
 
@@ -2582,13 +2596,13 @@ async function buildCocoAnnotationMap(files) {
     classNames.push(...Array.from(categoryById.values()));
     const imageById = new Map((coco.images || []).map(image => [image.id, image]));
     (coco.images || []).forEach(image => {
-      const key = normalizedStem(image.file_name || '');
+      const key = normalizedAnnotationKey(image.file_name || '');
       if (key && !grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
     });
     (coco.annotations || []).forEach((ann, idx) => {
       const image = imageById.get(ann.image_id);
       if (!image) return;
-      const key = normalizedStem(image.file_name || '');
+      const key = normalizedAnnotationKey(image.file_name || '');
       if (!grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
       const className = categoryById.get(ann.category_id) || String(ann.category_id);
       grouped.get(key).boxes.push(...cocoAnnotationShapes(ann, className, idx + 1, image.width, image.height));
@@ -2956,13 +2970,13 @@ async function runValidation() {
   showLoading('MATCHING');
 
   for (const file of imageFiles) {
-    const key = normalizedStem(file.name);
+    const key = normalizedFilePathStem(file);
     if (!imageMap.has(key)) imageMap.set(key, []);
     imageMap.get(key).push(file);
   }
   for (const file of labelFiles) {
     if (annotationFormat === 'yolo') {
-      const key = normalizedStem(file.name);
+      const key = normalizedFilePathStem(file);
       if (!labelMap.has(key)) labelMap.set(key, []);
       labelMap.get(key).push(file);
     }
@@ -2975,7 +2989,7 @@ async function runValidation() {
   if (annotationFormat !== 'yolo') {
     const matchedImageKeys = new Set();
     labelMap.forEach((_, key) => {
-      imagesForKey(key).forEach(file => matchedImageKeys.add(normalizedStem(file.name)));
+      imagesForKey(key).forEach(file => matchedImageKeys.add(normalizedFilePathStem(file)));
     });
     allKeys = new Set([
       ...labelMap.keys(),
