@@ -2302,13 +2302,24 @@ function filePath(file) {
   return file.webkitRelativePath || file.name;
 }
 
+function normalizedPathToken(value) {
+  return String(value || '')
+    .replace(/\\/g, '/')
+    .replace(/\.[^/.]+$/, '')
+    .replace(/^\/+|\/+$/g, '')
+    .normalize('NFC')
+    .toLowerCase();
+}
+
 function imageMatchesAnnotationKey(file, annotationKey) {
   const annotationToken = compactMatchToken(annotationKey);
   const pathToken = compactMatchToken(filePath(file));
   const nameToken = compactMatchToken(file.name);
   if (!annotationToken || !nameToken) return false;
   if (/[\\/]/.test(String(annotationKey || ''))) {
-    return pathToken.includes(annotationToken) || annotationToken.includes(pathToken);
+    const annotationPath = normalizedPathToken(annotationKey);
+    const imagePath = normalizedPathToken(filePath(file));
+    return imagePath === annotationPath || imagePath.endsWith(`/${annotationPath}`);
   }
   return annotationToken.includes(nameToken) || pathToken.includes(annotationToken) || annotationToken.includes(pathToken);
 }
