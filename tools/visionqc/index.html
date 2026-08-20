@@ -3923,15 +3923,15 @@ document.addEventListener('keydown', (e) => {
     markOk();
     return;
   }
+  const key = e.key.toLowerCase();
+  if ((key === 'h' || e.code === 'KeyH') && !e.repeat) { e.preventDefault(); toggleMainViewMode(); return; }
   const tag = document.activeElement ? document.activeElement.tagName : '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  const key = e.key.toLowerCase();
   if (/^[1-7]$/.test(key)) {
     e.preventDefault();
     handleIssueShortcut(Number(key));
     return;
   }
-  if (key === 'h' && !e.repeat) { e.preventDefault(); toggleMainViewMode(); return; }
   if (key === 'f' || e.key === 'ArrowRight') { e.preventDefault(); nextItem(); }
   else if (key === 'd' || e.key === 'ArrowLeft') { e.preventDefault(); prevItem(); }
 });
@@ -4694,9 +4694,7 @@ function drawLensShape(ctx, shape, sx, sy, imgW, imgH, scaleX, scaleY) {
 initMagnifier();
 
 function renderMeta(record) {
-  const sourcePath = record.imageFile ? filePath(record.imageFile) : record.labelFile ? filePath(record.labelFile) : '';
-  const annotationPath = record.id && /[\\/]/.test(record.id) ? record.id : '';
-  const displayPath = sourcePath && sourcePath !== record.imageFile?.name ? sourcePath : annotationPath || sourcePath || record.baseName;
+  const displayPath = recordDisplayPath(record);
   const rows = [
     ['NO', record.order ? `${record.order} / ${reviewableTotal}` : '-'],
     ['PATH', displayPath],
@@ -4719,6 +4717,12 @@ function renderMeta(record) {
   document.querySelectorAll('#metaTable [data-copy]').forEach(btn => {
     btn.addEventListener('click', () => copyText(btn.dataset.copy || ''));
   });
+}
+
+function recordDisplayPath(record) {
+  const sourcePath = record.imageFile ? filePath(record.imageFile) : record.labelFile ? filePath(record.labelFile) : '';
+  const annotationPath = record.annotationKey || (record.id && /[\\/]/.test(record.id) ? record.id : '');
+  return sourcePath && sourcePath !== record.imageFile?.name ? sourcePath : annotationPath || sourcePath || record.baseName;
 }
 
 async function copyText(text) {
@@ -5522,7 +5526,7 @@ function feedbackRows() {
     .filter(group => scopedIds.has(group.id))
     .flatMap(group => {
       const record = records.find(item => item.id === group.id);
-      if (!record || !record.imageFile) return [];
+      if (!record || !record.imageFile || record.boxes.length === 0) return [];
       return (group.issues || []).map(issue => ({ record, issue }));
     })
     .sort((a, b) => {
@@ -5612,7 +5616,7 @@ async function openFeedbackDeck() {
         ${slideData.items.map((item, itemIndex) => `
           <div class="feedback-item">
             <div class="feedback-item-meta">
-              <span>${escapeHtml(item.record.baseName || item.record.imageFile.name)}</span>
+              <span>${escapeHtml(recordDisplayPath(item.record))}</span>
               <span>${escapeHtml(item.issue.targetLabel || 'IMAGE')}</span>
             </div>
             <div class="feedback-canvas-wrap"><canvas data-slide-index="${index}" data-item-index="${itemIndex}"></canvas></div>
@@ -5933,7 +5937,7 @@ function saveFeedbackDraft() {
       issueType: slide.issueType,
       comment: slide.comment,
       items: slide.items.map(item => ({
-        file: item.record.baseName,
+        file: recordDisplayPath(item.record),
         target: item.issue.targetLabel || 'IMAGE',
         types: item.issue.types || [],
         note: item.issue.note || '',
