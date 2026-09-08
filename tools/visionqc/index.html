@@ -6330,6 +6330,7 @@ function statusLabel(record) {
 }
 
 function resetAll() {
+  allowPageLeave = true;
   exitReviewMode();
   closeCompareView();
   classFilter = '__all__';
@@ -6400,11 +6401,46 @@ function resetAll() {
   updateClassSummary();
   renderStats();
   renderIssuesList();
+  allowPageLeave = false;
 }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
+
+let allowPageLeave = false;
+let suppressNextPopState = false;
+
+function shouldConfirmPageLeave() {
+  return !allowPageLeave && (records.length > 0 || imageFiles.length > 0 || labelFiles.length > 0 || issueMap.size > 0 || reviewedSet.size > 0);
+}
+
+window.addEventListener('beforeunload', event => {
+  if (!shouldConfirmPageLeave()) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+
+function armHistoryLeaveGuard() {
+  history.replaceState({ visionQcGuard: true }, '', location.href);
+  history.pushState({ visionQcGuard: true }, '', location.href);
+}
+
+window.addEventListener('popstate', () => {
+  if (suppressNextPopState) {
+    suppressNextPopState = false;
+    return;
+  }
+  if (!shouldConfirmPageLeave()) return;
+  const ok = window.confirm('진짜 나가겠습니까?');
+  if (ok) {
+    allowPageLeave = true;
+    suppressNextPopState = true;
+    history.back();
+  } else {
+    history.pushState({ visionQcGuard: true }, '', location.href);
+  }
+});
 
 readClassInput();
 renderClassControls();
@@ -6412,6 +6448,7 @@ renderMissingClassOptions();
 populateBulkIssueTypes();
 updateMissingClassVisibility();
 updateClassSummary();
+armHistoryLeaveGuard();
 </script>
 </body>
 </html>
