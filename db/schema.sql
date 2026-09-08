@@ -23,3 +23,18 @@ ON review_results(source_type, image_key);
 
 CREATE INDEX IF NOT EXISTS idx_review_results_updated_at
 ON review_results(updated_at);
+
+CREATE TABLE IF NOT EXISTS slides_projects (
+  project_id TEXT PRIMARY KEY,
+  presentation_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS slides_pages (
+  project_id TEXT NOT NULL,
+  image_key TEXT NOT NULL,
+  slide_object_id TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (project_id, image_key)
+);

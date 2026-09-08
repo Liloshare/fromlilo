@@ -1702,6 +1702,7 @@
           <button onclick="exportJson()" id="jsonBtn" disabled>JSON</button>
           <button onclick="openFeedbackDeck()" id="feedbackBtn" disabled>FEEDBACK</button>
           <button onclick="downloadMissingImages()" id="missingPngBtn" disabled>MISSING PNG</button>
+          <button onclick="syncSlides()" id="syncSlidesBtn" disabled>SYNC SLIDES</button>
         </div>
       </div>
     </section>
@@ -2653,31 +2654,54 @@ async function handleLabels(files) {
   checkReady();
 }
 
+function labelParseFailureSuffix(failedFiles) {
+  return failedFiles && failedFiles.length ? ` / 실패 ${failedFiles.length}` : '';
+}
+
 async function handleJsonAnnotations(jsonFiles) {
   labelFiles = jsonFiles;
-  const first = JSON.parse(await jsonFiles[0].text());
+  let first = null;
+  for (const file of jsonFiles) {
+    try {
+      first = JSON.parse(await file.text());
+      break;
+    } catch (error) {
+      console.warn('label_type_detect_failed', file.name, error);
+    }
+  }
+  if (!first) {
+    labelDrop.classList.add('loaded');
+    labelDrop.querySelector('strong').textContent = `LABEL 0/${labelFiles.length}`;
+    labelDrop.querySelector('span').textContent = 'JSON 파싱 실패 (콘솔 확인)';
+    alert('라벨 JSON을 하나도 읽지 못했습니다. 브라우저 콘솔을 확인해주세요.');
+    return;
+  }
+
   if (isArrowKeypointJson(first)) {
     annotationFormat = 'arrowkp';
-    await buildArrowKeypointAnnotationMap(jsonFiles);
+    const failed = await buildArrowKeypointAnnotationMap(jsonFiles);
     labelDrop.classList.add('loaded');
     labelDrop.querySelector('strong').textContent = `KEYPOINT ${annotationMap.size}`;
-    labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON`;
+    labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON${labelParseFailureSuffix(failed)}`;
+    if (failed.length) console.warn('arrowkp_parse_failed_files', failed);
     return;
   }
   if (Array.isArray(first.images) && Array.isArray(first.annotations)) {
     annotationFormat = 'coco';
-    await buildCocoAnnotationMap(jsonFiles);
+    const failed = await buildCocoAnnotationMap(jsonFiles);
     labelDrop.classList.add('loaded');
     labelDrop.querySelector('strong').textContent = `COCO ${annotationMap.size}`;
-    labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON`;
+    labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON${labelParseFailureSuffix(failed)}`;
+    if (failed.length) console.warn('coco_parse_failed_files', failed);
     return;
   }
 
   annotationFormat = 'labelme';
-  await buildLabelMeAnnotationMap(jsonFiles);
+  const failed = await buildLabelMeAnnotationMap(jsonFiles);
   labelDrop.classList.add('loaded');
   labelDrop.querySelector('strong').textContent = `LABELME ${annotationMap.size}`;
-  labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON`;
+  labelDrop.querySelector('span').textContent = `${classes.length} CLASS / ${labelFiles.length} JSON${labelParseFailureSuffix(failed)}`;
+  if (failed.length) console.warn('labelme_parse_failed_files', failed);
 }
 
 function isArrowKeypointJson(data) {
@@ -2688,64 +2712,78 @@ function isArrowKeypointJson(data) {
 async function buildCocoAnnotationMap(files) {
   const grouped = new Map();
   const classNames = [];
+  const failedFiles = [];
   for (const file of files) {
-    const coco = JSON.parse(await file.text());
-    if (!Array.isArray(coco.images) || !Array.isArray(coco.annotations)) continue;
-    const categoryById = new Map((coco.categories || []).map(cat => [cat.id, cat.name || String(cat.id)]));
-    classNames.push(...Array.from(categoryById.values()));
-    const imageById = new Map((coco.images || []).map(image => [image.id, image]));
-    (coco.images || []).forEach(image => {
-      const key = normalizedAnnotationKey(image.file_name || '');
-      if (key && !grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
-    });
-    (coco.annotations || []).forEach((ann, idx) => {
-      const image = imageById.get(ann.image_id);
-      if (!image) return;
-      const key = normalizedAnnotationKey(image.file_name || '');
-      if (!grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
-      const className = categoryById.get(ann.category_id) || String(ann.category_id);
-      grouped.get(key).boxes.push(...cocoAnnotationShapes(ann, className, idx + 1, image.width, image.height));
-    });
+    try {
+      const coco = JSON.parse(await file.text());
+      if (!Array.isArray(coco.images) || !Array.isArray(coco.annotations)) continue;
+      const categoryById = new Map((coco.categories || []).map(cat => [cat.id, cat.name || String(cat.id)]));
+      classNames.push(...Array.from(categoryById.values()));
+      const imageById = new Map((coco.images || []).map(image => [image.id, image]));
+      (coco.images || []).forEach(image => {
+        const key = normalizedAnnotationKey(image.file_name || '');
+        if (key && !grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
+      });
+      (coco.annotations || []).forEach((ann, idx) => {
+        const image = imageById.get(ann.image_id);
+        if (!image) return;
+        const key = normalizedAnnotationKey(image.file_name || '');
+        if (!grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
+        const className = categoryById.get(ann.category_id) || String(ann.category_id);
+        grouped.get(key).boxes.push(...cocoAnnotationShapes(ann, className, idx + 1, image.width, image.height));
+      });
+    } catch (error) {
+      console.warn('coco_file_parse_failed', file.name, error);
+      failedFiles.push(file.name);
+    }
   }
-  setAnnotationClasses(classNames);
   annotationMap = grouped;
+  setAnnotationClasses(classNames);
+  return failedFiles;
 }
 
 async function buildArrowKeypointAnnotationMap(files) {
   const grouped = new Map();
   const classNames = [];
+  const failedFiles = [];
   for (const file of files) {
-    const data = JSON.parse(await file.text());
-    const images = Array.isArray(data?.images) ? data.images : Array.isArray(data) ? data : [];
-    images.forEach((image, imageIdx) => {
-      const fileName = String(image.file_name || image.fileName || image.filename || `image_${image.image_id || imageIdx + 1}`);
-      const key = normalizedAnnotationKey(fileName);
-      const imgW = Number(image.width) || null;
-      const imgH = Number(image.height) || null;
-      const boxes = [];
-      (image.annotations || []).forEach((ann, annIdx) => {
-        const rawLabel = String(ann.label || ann.name || `Keypoint_${annIdx + 1}`);
-        const parsed = parseArrowKeypointLabel(rawLabel);
-        const className = parsed.part ? `${parsed.invisible ? 'invi_' : ''}${parsed.part}` : rawLabel;
-        (ann.points || []).forEach((point, pointIdx) => {
-          const shape = makeKeypointShape(className, point, annIdx + 1, imgW, imgH);
-          if (!shape) return;
-          shape.rawLabel = rawLabel;
-          shape.trackId = ann.track_id ?? ann.trackId ?? '';
-          shape.visibility = ann.visibility ?? '';
-          shape.score = readKeypointScore(ann, point);
-          shape.arrowId = parsed.arrowId;
-          shape.part = parsed.part;
-          shape.pointIndex = pointIdx + 1;
-          boxes.push(shape);
-          classNames.push(className);
+    try {
+      const data = JSON.parse(await file.text());
+      const images = Array.isArray(data?.images) ? data.images : Array.isArray(data) ? data : [];
+      images.forEach((image, imageIdx) => {
+        const fileName = String(image.file_name || image.fileName || image.filename || `image_${image.image_id || imageIdx + 1}`);
+        const key = normalizedAnnotationKey(fileName);
+        const imgW = Number(image.width) || null;
+        const imgH = Number(image.height) || null;
+        const boxes = [];
+        (image.annotations || []).forEach((ann, annIdx) => {
+          const rawLabel = String(ann.label || ann.name || `Keypoint_${annIdx + 1}`);
+          const parsed = parseArrowKeypointLabel(rawLabel);
+          const className = parsed.part ? `${parsed.invisible ? 'invi_' : ''}${parsed.part}` : rawLabel;
+          (ann.points || []).forEach((point, pointIdx) => {
+            const shape = makeKeypointShape(className, point, annIdx + 1, imgW, imgH);
+            if (!shape) return;
+            shape.rawLabel = rawLabel;
+            shape.trackId = ann.track_id ?? ann.trackId ?? '';
+            shape.visibility = ann.visibility ?? '';
+            shape.score = readKeypointScore(ann, point);
+            shape.arrowId = parsed.arrowId;
+            shape.part = parsed.part;
+            shape.pointIndex = pointIdx + 1;
+            boxes.push(shape);
+            classNames.push(className);
+          });
         });
+        if (key) grouped.set(key, { file, image: { file_name: fileName, width: imgW, height: imgH }, boxes });
       });
-      if (key) grouped.set(key, { file, image: { file_name: fileName, width: imgW, height: imgH }, boxes });
-    });
+    } catch (error) {
+      console.warn('arrowkp_file_parse_failed', file.name, error);
+      failedFiles.push(file.name);
+    }
   }
-  setAnnotationClasses(classNames);
   annotationMap = grouped;
+  setAnnotationClasses(classNames);
+  return failedFiles;
 }
 
 function parseArrowKeypointLabel(label) {
@@ -2792,29 +2830,36 @@ function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
 async function buildLabelMeAnnotationMap(files) {
   const grouped = new Map();
   const classNames = [];
+  const failedFiles = [];
   for (const file of files) {
-    const data = JSON.parse(await file.text());
-    const key = normalizedStem(data.imagePath || file.name);
-    const imgW = Number(data.imageWidth) || null;
-    const imgH = Number(data.imageHeight) || null;
-    const boxes = (data.shapes || []).flatMap((shape, idx) => {
-      const className = String(shape.label || 'LABEL');
-      classNames.push(className);
-      if (shape.shape_type === 'rectangle' && Array.isArray(shape.points) && shape.points.length >= 2) {
-        return [rectangleToShape(className, shape.points, idx + 1, imgW, imgH)];
-      }
-      if (Array.isArray(shape.points) && shape.points.length >= 3) {
-        return [makePolygonShape(className, shape.points, idx + 1, imgW, imgH)];
-      }
-      if (shape.shape_type === 'point' && Array.isArray(shape.points) && shape.points.length >= 1) {
-        return [makeKeypointShape(className, shape.points[0], idx + 1, imgW, imgH)];
-      }
-      return [];
-    }).filter(Boolean);
-    grouped.set(key, { file, image: { file_name: data.imagePath, width: imgW, height: imgH }, boxes });
+    try {
+      const data = JSON.parse(await file.text());
+      const key = normalizedStem(data.imagePath || file.name);
+      const imgW = Number(data.imageWidth) || null;
+      const imgH = Number(data.imageHeight) || null;
+      const boxes = (data.shapes || []).flatMap((shape, idx) => {
+        const className = String(shape.label || 'LABEL');
+        classNames.push(className);
+        if (shape.shape_type === 'rectangle' && Array.isArray(shape.points) && shape.points.length >= 2) {
+          return [rectangleToShape(className, shape.points, idx + 1, imgW, imgH)];
+        }
+        if (Array.isArray(shape.points) && shape.points.length >= 3) {
+          return [makePolygonShape(className, shape.points, idx + 1, imgW, imgH)];
+        }
+        if (shape.shape_type === 'point' && Array.isArray(shape.points) && shape.points.length >= 1) {
+          return [makeKeypointShape(className, shape.points[0], idx + 1, imgW, imgH)];
+        }
+        return [];
+      }).filter(Boolean);
+      grouped.set(key, { file, image: { file_name: data.imagePath, width: imgW, height: imgH }, boxes });
+    } catch (error) {
+      console.warn('labelme_file_parse_failed', file.name, error);
+      failedFiles.push(file.name);
+    }
   }
-  setAnnotationClasses(classNames);
   annotationMap = grouped;
+  setAnnotationClasses(classNames);
+  return failedFiles;
 }
 
 function pointsToPairs(points) {
@@ -3197,6 +3242,7 @@ async function runValidation() {
     document.getElementById('jsonBtn').disabled = false;
     document.getElementById('feedbackBtn').disabled = false;
     document.getElementById('missingPngBtn').disabled = false;
+    document.getElementById('syncSlidesBtn').disabled = false;
     document.getElementById('statusText').textContent = 'READY';
     hideLoading();
   });
@@ -5787,6 +5833,103 @@ function downloadMissingImages() {
   URL.revokeObjectURL(url);
 }
 
+let slidesProjectId = '';
+function getSlidesProjectId() {
+  const cloudValue = document.getElementById('cloudProjectInput').value.trim();
+  if (cloudValue) return cloudValue;
+  if (slidesProjectId) return slidesProjectId;
+  const entered = prompt('SLIDES PROJECT ID\n(구글 슬라이드를 프로젝트별로 구분할 이름. 같은 이름으로 SYNC하면 같은 슬라이드가 갱신됩니다)');
+  slidesProjectId = (entered || '').trim();
+  return slidesProjectId;
+}
+
+async function renderSlideSyncCanvas(record, group) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1600;
+  canvas.height = 900;
+  const ctx = canvas.getContext('2d');
+  const img = await loadImage(record.imageFile);
+  ctx.fillStyle = '#151823';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const scale = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+  const drawW = Math.round(img.naturalWidth * scale);
+  const drawH = Math.round(img.naturalHeight * scale);
+  const dx = Math.round((canvas.width - drawW) / 2);
+  const dy = Math.round((canvas.height - drawH) / 2);
+  ctx.drawImage(img, dx, dy, drawW, drawH);
+  ctx.save();
+  ctx.translate(dx, dy);
+  drawBoxes(ctx, record, drawW, drawH, img.naturalWidth, img.naturalHeight, false);
+  (group.issues || []).forEach(issue => drawFeedbackTarget(ctx, record, issue, drawW, drawH, img.naturalWidth, img.naturalHeight));
+  ctx.restore();
+  (group.issues || []).forEach(issue => drawIssueArrows(ctx, issue, canvas.width, canvas.height));
+  return canvas.toDataURL('image/png');
+}
+
+async function syncSlides() {
+  const scopedIds = new Set(scopedRecords().map(record => record.id));
+  const groups = Array.from(issueMap.values()).filter(group => scopedIds.has(group.id) && (group.issues || []).length);
+  if (!groups.length) {
+    alert('SYNC할 이슈가 없습니다.');
+    return;
+  }
+  const projectId = getSlidesProjectId();
+  if (!projectId) return;
+
+  const btn = document.getElementById('syncSlidesBtn');
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+
+  try {
+    const payloadItems = [];
+    for (const group of groups) {
+      const record = records.find(item => item.id === group.id);
+      if (!record || !record.imageFile) continue;
+      const source = recordSource(record);
+      const imageDataUrl = await renderSlideSyncCanvas(record, group);
+      payloadItems.push({
+        imageKey: source.imageKey,
+        imageFilename: source.imageFilename,
+        note: group.issues.map(issue => issue.note).filter(Boolean).join(' | '),
+        issueTypes: Array.from(new Set(group.issues.flatMap(issue => issue.types || []))),
+        imageDataUrl
+      });
+    }
+    if (!payloadItems.length) {
+      alert('SYNC할 이미지가 없습니다.');
+      return;
+    }
+
+    const CHUNK = 6;
+    let updated = 0;
+    let presentationUrl = '';
+    for (let i = 0; i < payloadItems.length; i += CHUNK) {
+      const chunk = payloadItems.slice(i, i + CHUNK);
+      btn.textContent = `SYNCING ${Math.min(i + CHUNK, payloadItems.length)}/${payloadItems.length}`;
+      const response = await fetch('/api/sync-slides', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, images: chunk })
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok || !json.ok) throw new Error(json.error || 'sync_failed');
+      updated += json.updated || 0;
+      presentationUrl = json.presentationUrl || presentationUrl;
+    }
+
+    btn.textContent = originalLabel;
+    if (presentationUrl && confirm(`SYNC 완료 (${updated}장). 슬라이드를 여시겠습니까?`)) {
+      window.open(presentationUrl, '_blank');
+    }
+  } catch (error) {
+    console.warn(error);
+    alert('SYNC 실패: ' + (error?.message || error));
+    btn.textContent = originalLabel;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function safeFileName(name) {
   return String(name).replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120);
 }
@@ -6390,6 +6533,7 @@ function resetAll() {
   document.getElementById('jsonBtn').disabled = true;
   document.getElementById('feedbackBtn').disabled = true;
   document.getElementById('missingPngBtn').disabled = true;
+  document.getElementById('syncSlidesBtn').disabled = true;
   document.getElementById('gallery').innerHTML = '';
   document.getElementById('boxList').innerHTML = '';
   document.getElementById('mainCanvas').width = 1;
