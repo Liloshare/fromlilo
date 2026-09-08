@@ -1977,7 +1977,8 @@ const ISSUE_TYPES = [
   ['wrong_box', 'SIZE'],
   ['consis', 'CONSIS'],
   ['missing', 'MISSING'],
-  ['unnecessary', 'DELETE']
+  ['unnecessary', 'DELETE'],
+  ['checking', 'CHECKING']
 ];
 
 let imageFiles = [];
@@ -2008,6 +2009,8 @@ let selectedBoxIndices = new Set();
 let missingArrowMode = false;
 let missingArrowDraft = null;
 let missingArrowPending = [];
+let arrowIssueType = 'missing';
+let arrowIssueColors = { missing: '#ff2d55', checking: '#f59e0b' };
 
 // review-mode ("하나씩 넘기기") navigation queue, snapshot of the filtered list at the
 // moment review mode was entered so marking a record OK/issue doesn't yank it out from
@@ -2123,7 +2126,13 @@ async function loadCloudProject() {
 function actionFromIssue(issue) {
   if (!issue) return 'approved';
   const entries = issue.issues || [issue];
-  return entries.flatMap(entry => entry.types || []).join('|') || 'issue';
+  const types = entries.flatMap(entry => entry.types || []);
+  if (types.length && types.every(type => type === 'checking')) return 'checking';
+  return types.join('|') || 'issue';
+}
+
+function hasErrorIssue(group) {
+  return (group?.issues || []).some(issue => (issue.types || []).some(type => type !== 'checking'));
 }
 
 function summarizeIssue(issue) {
@@ -3320,7 +3329,7 @@ function renderStats() {
   const duplicate = scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length;
   const boxes = scoped.reduce((sum, r) => sum + r.boxes.length, 0);
   const reviewed = scoped.filter(r => r.status === 'matched' && reviewedSet.has(r.id) && !issueMap.has(r.id)).length;
-  const issueCount = Array.from(issueMap.values()).filter(issue => scopedIds.has(issue.id) && (issue.issues || []).length > 0).length;
+  const issueCount = Array.from(issueMap.values()).filter(issue => scopedIds.has(issue.id) && hasErrorIssue(issue)).length;
   const remain = scoped.filter(r => isRemainRecord(r)).length;
   document.getElementById('statImages').textContent = scoped.filter(r => r.imageFile).length;
   document.getElementById('statMatched').textContent = matched;
@@ -3449,12 +3458,13 @@ function filteredRecords() {
   return scopedRecords().filter(r => {
     if (f === 'all') {
       if (!r.imageFile && annotationFormat === 'yolo') return false;
+      if (r.status === 'matched' && r.boxes.length === 0) return false;
     } else if (r.status !== 'matched') return false;
     const dup = isDuplicate(r);
     if (f === 'all') {
       // keep every uploaded image record in the main view
     } else if (f === 'matched') {
-      // keep every matched image in the main view, including duplicate and zero-box records
+      if (r.boxes.length === 0) return false;
     } else if (f === 'duplicate') {
       if (!dup) return false;
     } else if (f === 'zero') {
@@ -3463,7 +3473,7 @@ function filteredRecords() {
       if (dup || r.boxes.length === 0) return false;
     } else {
       if (dup || r.boxes.length === 0) return false;
-      if (f === 'issue' && !issueMap.has(r.id)) return false;
+      if (f === 'issue' && !hasErrorIssue(issueMap.get(r.id))) return false;
       if (f === 'unreviewed' && isReviewed(r)) return false;
       if (f === 'done' && !isReviewed(r)) return false;
       if (f === 'remain' && !isRemainRecord(r)) return false;
@@ -3485,7 +3495,7 @@ function thumbClassName(record) {
   // A variant card's issue/review state belongs to its parent duplicate
   // group's id, not the variant's own synthetic id.
   const checkId = record.isVariant ? record.parentRecord.id : record.id;
-  return `thumb ${record.id === records[currentIndex]?.id ? 'active' : ''} ${issueMap.has(checkId) ? 'issue' : (isReviewed({ id: checkId }) ? 'reviewed' : '')} ${dupOrZero}`;
+  return `thumb ${record.id === records[currentIndex]?.id ? 'active' : ''} ${hasErrorIssue(issueMap.get(checkId)) ? 'issue' : (isReviewed({ id: checkId }) ? 'reviewed' : '')} ${dupOrZero}`;
 }
 
 function thumbOrderLabel(record) {
@@ -3612,8 +3622,8 @@ function renderGallery() {
       }
       reviewQueue = filteredRecords();
       reviewPos = reviewQueue.indexOf(record);
-      selectRecord(records.indexOf(record));
       enterReviewMode();
+      selectRecord(records.indexOf(record));
     });
     gallery.appendChild(card);
     galleryThumbMap.set(record.id, { card, canvas, record });
@@ -3957,8 +3967,11 @@ function toggleReviewMode() {
 }
 
 document.addEventListener('keydown', (e) => {
+  const tag = document.activeElement ? document.activeElement.tagName : '';
+  const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable;
   if (e.key === 'Escape') { hideIssuePopup(); closeConsistencyBoard(); closeCompareView(); exitReviewMode(); return; }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    if (isTyping && !missingArrowMode) return;
     e.preventDefault();
     if (missingArrowMode) {
       confirmMissingArrow();
@@ -3968,10 +3981,9 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   const key = e.key.toLowerCase();
+  if (isTyping) return;
   if ((key === 'h' || e.code === 'KeyH') && !e.repeat) { e.preventDefault(); toggleMainViewMode(); return; }
-  const tag = document.activeElement ? document.activeElement.tagName : '';
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if (/^[1-7]$/.test(key)) {
+  if (/^[1-8]$/.test(key)) {
     e.preventDefault();
     handleIssueShortcut(Number(key));
     return;
@@ -3992,7 +4004,8 @@ async function renderCurrent() {
     document.getElementById('metaTable').innerHTML = '<div class="meta-row"><div class="meta-key">FILE</div><div class="meta-val">EMPTY</div></div>';
     return;
   }
-  await renderCanvas(canvas, record, mainCanvasMaxWidth(), true);
+  const size = mainCanvasFitSize();
+  await renderCanvas(canvas, record, size.width, true, size.height);
   magnifierImg = record.imageFile ? await loadImage(record.imageFile) : null;
   renderMeta(record);
   if (boxSummary) boxSummary.textContent = `(${record.boxes.length})`;
@@ -4019,11 +4032,11 @@ async function renderCurrent() {
       btn.classList.toggle('active', selectedBoxIndices.has(idx));
       btn.addEventListener('mouseenter', () => {
         activeBoxIndex = idx;
-        renderCanvas(document.getElementById('mainCanvas'), record, mainCanvasMaxWidth(), true);
+        renderCanvas(document.getElementById('mainCanvas'), record, mainCanvasFitSize().width, true, mainCanvasFitSize().height);
       });
       btn.addEventListener('mouseleave', () => {
         activeBoxIndex = -1;
-        renderCanvas(document.getElementById('mainCanvas'), record, mainCanvasMaxWidth(), true);
+        renderCanvas(document.getElementById('mainCanvas'), record, mainCanvasFitSize().width, true, mainCanvasFitSize().height);
       });
       btn.addEventListener('click', () => {
         if (selectedBoxIndices.has(idx)) selectedBoxIndices.delete(idx);
@@ -4050,6 +4063,14 @@ function mainCanvasMaxWidth() {
   const frame = document.getElementById('canvasFrame');
   const frameWidth = frame?.clientWidth || 1200;
   return Math.max(1200, Math.floor(frameWidth - 24));
+}
+
+function mainCanvasFitSize() {
+  const frame = document.getElementById('canvasFrame');
+  return {
+    width: Math.max(320, Math.floor((frame?.clientWidth || 1200) - 24)),
+    height: Math.max(240, Math.floor((frame?.clientHeight || 760) - 24))
+  };
 }
 
 function objectTypeSummary(items) {
@@ -4079,7 +4100,7 @@ function formatScore(value) {
   return Number.isFinite(num) ? String(Math.round(num * 1000) / 1000) : String(value);
 }
 
-async function renderCanvas(canvas, record, maxWidth, isMain = false) {
+async function renderCanvas(canvas, record, maxWidth, isMain = false, maxHeight = Infinity) {
   const ctx = canvas.getContext('2d');
   if (!record.imageFile) {
     canvas.width = maxWidth;
@@ -4093,7 +4114,7 @@ async function renderCanvas(canvas, record, maxWidth, isMain = false) {
   }
   const img = await loadImage(record.imageFile);
   record.imageSize = { width: img.naturalWidth, height: img.naturalHeight };
-  const scale = Math.min(1, maxWidth / img.naturalWidth);
+  const scale = Math.min(1, maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
   const w = Math.max(1, Math.round(img.naturalWidth * scale));
   const h = Math.max(1, Math.round(img.naturalHeight * scale));
   canvas.width = w;
@@ -4229,7 +4250,7 @@ function drawOverlayLegend(ctx, record, classNames, canvasW) {
 function drawSavedMissingArrows(ctx, record, canvasW, canvasH) {
   const issues = getRecordIssue(record)?.issues || [];
   issues
-    .filter(issue => (issue.types || []).includes('missing') && (issue.arrow || issue.arrows?.length))
+    .filter(issue => (issue.types || []).some(type => type === 'missing' || type === 'checking') && (issue.arrow || issue.arrows?.length))
     .forEach(issue => (issue.arrows || [issue.arrow]).filter(Boolean).forEach(arrow => drawFeedbackShape(ctx, arrow, canvasW, canvasH, false)));
 }
 
@@ -4538,7 +4559,7 @@ function startMissingArrow(e) {
   e.preventDefault();
   const canvas = document.getElementById('mainCanvas');
   const point = canvasPoint(e, canvas);
-  missingArrowDraft = { type: 'arrow', color: '#ff2d55', x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+  missingArrowDraft = { type: 'arrow', color: arrowIssueColors[arrowIssueType] || '#ff2d55', x1: point.x, y1: point.y, x2: point.x, y2: point.y };
 }
 
 async function previewMissingArrow(e) {
@@ -4549,7 +4570,8 @@ async function previewMissingArrow(e) {
   missingArrowDraft.y2 = point.y;
   const record = records[currentIndex];
   if (!record) return;
-  await renderCanvas(canvas, record, mainCanvasMaxWidth(), true);
+  const size = mainCanvasFitSize();
+  await renderCanvas(canvas, record, size.width, true, size.height);
   drawFeedbackShape(canvas.getContext('2d'), missingArrowDraft, canvas.width, canvas.height, true);
 }
 
@@ -4565,17 +4587,19 @@ async function finishMissingArrow(e) {
   await renderCurrent();
 }
 
-async function saveMissingArrowIssue(arrows) {
+async function saveArrowIssue(arrows) {
   const record = records[currentIndex];
   if (!record) return;
-  const imageData = await renderMissingIssueImage(record, arrows);
+  const note = document.getElementById('noteInput').value.trim();
+  const imageData = await renderArrowIssueImage(record, arrows);
+  const type = arrowIssueType || 'missing';
   upsertIssue(record, {
     target: { type: 'image' },
-    targetKey: `image:missing:${Date.now()}`,
+    targetKey: `image:${type}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
     targetLabel: 'IMAGE',
-    types: ['missing'],
+    types: [type],
     missingClass: '',
-    note: '',
+    note,
     arrow: arrows[0] || null,
     arrows,
     imageData
@@ -4594,32 +4618,40 @@ async function confirmMissingArrow() {
   missingArrowMode = false;
   missingArrowPending = [];
   renderMissingArrowControls(false);
-  await saveMissingArrowIssue(arrows);
+  await saveArrowIssue(arrows);
 }
 
 function cancelMissingArrow(shouldRender = true) {
   missingArrowMode = false;
   missingArrowDraft = null;
   missingArrowPending = [];
+  arrowIssueType = 'missing';
   renderMissingArrowControls(false);
   if (shouldRender) renderCurrent();
 }
 
 function renderMissingArrowControls(show) {
   const field = document.getElementById('missingClassField');
-  document.getElementById('missingIssueBtn')?.classList.toggle('active', show || missingArrowMode);
+  document.getElementById('missingIssueBtn')?.classList.toggle('active', (show || missingArrowMode) && arrowIssueType === 'missing');
+  document.getElementById('checkingIssueBtn')?.classList.toggle('active', (show || missingArrowMode) && arrowIssueType === 'checking');
   if (!field) return;
   field.classList.toggle('hidden', !show && !missingArrowMode);
   field.innerHTML = show
-    ? `<div class="missing-arrow-actions"><span class="hint">Press Enter to save</span><button type="button" class="success" onclick="confirmMissingArrow()">SAVE</button><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
+    ? `<div class="missing-arrow-actions"><span class="hint">Press Enter to save</span>${missingArrowPending.map((_, idx) => `<button type="button" onclick="removePendingArrow(${idx})">× ${idx + 1}</button>`).join('')}<button type="button" class="success" onclick="confirmMissingArrow()">SAVE</button><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
     : missingArrowMode
       ? `<div class="missing-arrow-actions"><span class="hint">Draw arrow on image</span><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
       : '<div id="actionClassChecks"></div>';
 }
 
-async function renderMissingIssueImage(record, arrows) {
+function removePendingArrow(index) {
+  missingArrowPending.splice(index, 1);
+  renderMissingArrowControls(missingArrowPending.length > 0);
+  renderCurrent();
+}
+
+async function renderArrowIssueImage(record, arrows) {
   const canvas = document.createElement('canvas');
-  await renderCanvas(canvas, record, mainCanvasMaxWidth(), true);
+  await renderCanvas(canvas, record, 960, true, 720);
   arrows.forEach(arrow => drawFeedbackShape(canvas.getContext('2d'), arrow, canvas.width, canvas.height, false));
   return canvas.toDataURL('image/png');
 }
@@ -4769,6 +4801,13 @@ function recordDisplayPath(record) {
   return sourcePath && sourcePath !== record.imageFile?.name ? sourcePath : annotationPath || sourcePath || record.baseName;
 }
 
+function recordFolderPath(record, depth = 4) {
+  const path = recordDisplayPath(record).replace(/\\/g, '/');
+  const parts = path.split('/').filter(Boolean);
+  if (parts.length <= 1) return '';
+  return parts.slice(Math.max(0, parts.length - 1 - depth), -1).join('/');
+}
+
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -4799,6 +4838,7 @@ function buildIssueChecks() {
     </div>
     <div class="issue-column">
       <button type="button" class="check" onclick="saveCurrentPass()"><span class="issue-num">7</span> Pass</button>
+      ${issueButtonHtml('checking', 'Checking', 8)}
     </div>
   `;
   renderIssuePopover();
@@ -4806,7 +4846,7 @@ function buildIssueChecks() {
 buildIssueChecks();
 
 function issueButtonHtml(value, label, shortcut) {
-  const id = value === 'missing' ? ' id="missingIssueBtn"' : '';
+  const id = value === 'missing' ? ' id="missingIssueBtn"' : value === 'checking' ? ' id="checkingIssueBtn"' : '';
   return `<button type="button" class="check"${id} onclick="saveIssueType('${value}')"><span class="issue-num">${shortcut}</span> ${label}</button>`;
 }
 
@@ -4845,6 +4885,7 @@ function renderIssuePopover() {
     </div>
     <div class="issue-column">
       <button type="button" class="check" onclick="saveCurrentPass()"><span class="issue-num">7</span> Pass</button>
+      <button type="button" class="check" onclick="saveIssueType('checking')"><span class="issue-num">8</span> Checking</button>
     </div>
   `;
 }
@@ -4869,11 +4910,18 @@ function hideIssuePopup() {
 function saveIssueType(type) {
   const record = records[currentIndex];
   if (!record) return;
-  if (type === 'missing') {
+  if (type === 'missing' || type === 'checking') {
+    arrowIssueType = type;
     missingArrowMode = true;
     missingArrowDraft = null;
     missingArrowPending = [];
+    if (type === 'checking') toggleCommentField(true);
     renderMissingArrowControls(false);
+    hideIssuePopup();
+    return;
+  }
+  if (type === 'wrong_class') {
+    renderClassMismatchOptions();
     hideIssuePopup();
     return;
   }
@@ -4908,7 +4956,8 @@ function handleIssueShortcut(number) {
     2: 'wrong_box',
     3: 'missing',
     4: 'unnecessary',
-    5: 'consis'
+    5: 'consis',
+    8: 'checking'
   };
   if (number === 6) {
     toggleCommentField(true);
@@ -4923,6 +4972,48 @@ function handleIssueShortcut(number) {
 
 function updateMissingClassVisibility() {
   document.getElementById('missingClassField').classList.add('hidden');
+}
+
+function renderClassMismatchOptions() {
+  const record = records[currentIndex];
+  if (!record) return;
+  const field = document.getElementById('missingClassField');
+  const target = buildCurrentIssueTarget(record);
+  field.classList.remove('hidden');
+  field.innerHTML = `
+    <div class="missing-arrow-actions">
+      <span class="hint">Correct class</span>
+      <select id="classMismatchSelect">
+        <option value="">SELECT</option>
+        ${classes.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}
+      </select>
+      <button type="button" class="success" onclick="saveClassMismatchIssue()">SAVE</button>
+      <button type="button" onclick="resetIssueDraft(); renderCurrent();">CANCEL</button>
+    </div>
+  `;
+  document.getElementById('classMismatchSelect')?.focus();
+}
+
+function saveClassMismatchIssue() {
+  const record = records[currentIndex];
+  if (!record) return;
+  const select = document.getElementById('classMismatchSelect');
+  const correctedClass = select?.value || '';
+  const target = buildCurrentIssueTarget(record);
+  upsertIssue(record, {
+    target,
+    targetKey: `${targetKey(target)}:wrong_class:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+    targetLabel: targetLabel(target),
+    types: ['wrong_class'],
+    missingClass: correctedClass ? `correct:${correctedClass}` : '',
+    note: ''
+  });
+  reviewedSet.delete(record.id);
+  renderStats();
+  renderIssuesList();
+  updateGalleryHighlights();
+  resetIssueDraft();
+  renderCurrent();
 }
 
 function loadIssueToForm() {
@@ -5106,7 +5197,8 @@ function groupedIssueRows(rows) {
   const map = new Map();
   rows.forEach(issue => {
     const target = issue.target || { type: 'image' };
-    const key = JSON.stringify(target);
+    const shouldSeparate = (issue.types || []).some(type => type === 'missing' || type === 'checking') && (issue.arrow || issue.arrows?.length);
+    const key = shouldSeparate ? issue.targetKey : JSON.stringify(target);
     if (!map.has(key)) {
       map.set(key, { key, keys: [], label: compactTargetLabel(issue), types: new Set(), missing: new Set(), notes: new Set() });
     }
@@ -5141,6 +5233,7 @@ function formatIssueTypes(types) {
     consis: 'CONSIS',
     missing: 'MISSING',
     unnecessary: 'DELETE',
+    checking: 'CHECKING',
     duplicate: 'DUPLICATE'
   };
   return types.map(type => labels[type] || type).join(', ');
@@ -5170,7 +5263,7 @@ function issueMatrixCell(issues, type) {
 
 function buildIssueMatrixRows() {
   const issueTypes = ISSUE_TYPES.map(([value]) => value);
-  const rows = [['file', ...issueTypes.map(issueTypeLabel), 'COMMENT']];
+  const rows = [['path', 'file', ...issueTypes.map(issueTypeLabel), 'COMMENT']];
   const scopedIds = new Set(scopedRecords().map(record => record.id));
   Array.from(issueMap.values())
     .filter(group => scopedIds.has(group.id))
@@ -5178,7 +5271,9 @@ function buildIssueMatrixRows() {
     .forEach(group => {
       const issues = group.issues || [];
       if (!issues.length) return;
+      const record = records.find(record => record.id === group.id);
       rows.push([
+        record ? recordFolderPath(record) : '',
         group.file || '',
         ...issueTypes.map(type => issueMatrixCell(issues, type)),
         Array.from(new Set(issues.map(issue => issue.note).filter(Boolean))).join('\n')
@@ -5188,31 +5283,33 @@ function buildIssueMatrixRows() {
 }
 
 function buildMissingSheet() {
-  const rows = [['file', 'target', 'arrow_count', 'image']];
+  const rows = [['path', 'file', 'target', 'arrow_count', 'image']];
   const images = [];
   const scopedIds = new Set(scopedRecords().map(record => record.id));
   Array.from(issueMap.values())
     .filter(group => scopedIds.has(group.id))
     .forEach(group => {
+      const record = records.find(record => record.id === group.id);
       (group.issues || [])
         .filter(issue => (issue.types || []).includes('missing'))
         .forEach(issue => {
           const rowIndex = rows.length;
           const arrows = issue.arrows || (issue.arrow ? [issue.arrow] : []);
           rows.push([
+            record ? recordFolderPath(record) : '',
             group.file || group.baseName || '',
             compactTargetLabel(issue),
             arrows.length,
             ''
           ]);
-          if (issue.imageData) images.push({ row: rowIndex, col: 3, data: dataUrlBytes(issue.imageData), width: 128, height: 82 });
+          if (issue.imageData) images.push({ row: rowIndex, col: 4, data: dataUrlBytes(issue.imageData), width: 128, height: 82 });
         });
     });
   return { name: 'missing', rows, images };
 }
 
 async function buildConsisSheet() {
-  const rows = [['file', 'target', 'comment', 'image']];
+  const rows = [['path', 'file', 'target', 'comment', 'image']];
   const images = [];
   const scoped = scopedRecords();
   const scopedIds = new Set(scoped.map(record => record.id));
@@ -5221,12 +5318,29 @@ async function buildConsisSheet() {
     if (!record) continue;
     for (const issue of (group.issues || []).filter(issue => (issue.types || []).includes('consis'))) {
       const rowIndex = rows.length;
-      rows.push([group.file || group.baseName || '', compactTargetLabel(issue), issue.note || '', '']);
+      rows.push([recordFolderPath(record), group.file || group.baseName || '', compactTargetLabel(issue), issue.note || '', '']);
       const imageData = await renderConsisIssueImage(record, issue);
-      images.push({ row: rowIndex, col: 3, data: dataUrlBytes(imageData), width: 128, height: 82 });
+      images.push({ row: rowIndex, col: 4, data: dataUrlBytes(imageData), width: 128, height: 82 });
     }
   }
   return { name: 'consis', rows, images };
+}
+
+async function buildCheckingSheet() {
+  const rows = [['path', 'file', 'comment', 'image']];
+  const images = [];
+  const scopedIds = new Set(scopedRecords().map(record => record.id));
+  for (const group of Array.from(issueMap.values()).filter(group => scopedIds.has(group.id))) {
+    const record = records.find(record => record.id === group.id);
+    if (!record) continue;
+    for (const issue of (group.issues || []).filter(issue => (issue.types || []).includes('checking'))) {
+      const rowIndex = rows.length;
+      rows.push([recordFolderPath(record), group.file || group.baseName || '', issue.note || '', '']);
+      const imageData = issue.imageData || await renderConsisIssueImage(record, issue);
+      images.push({ row: rowIndex, col: 3, data: dataUrlBytes(imageData), width: 128, height: 82 });
+    }
+  }
+  return { name: 'checking', rows, images };
 }
 
 async function renderConsisIssueImage(record, issue) {
@@ -5237,15 +5351,18 @@ async function renderConsisIssueImage(record, issue) {
 
 function buildSummaryRows() {
   const scoped = scopedRecords();
+  const scopedIds = new Set(scoped.map(record => record.id));
   const viewed = scoped.filter(record => viewedSet.has(record.id)).length;
-  const issueCount = Array.from(issueMap.values()).filter(group => (group.issues || []).length > 0).length;
-  const totalIssues = Array.from(issueMap.values()).reduce((sum, group) => sum + (group.issues || []).length, 0);
+  const issueCount = Array.from(issueMap.values()).filter(group => scopedIds.has(group.id) && hasErrorIssue(group)).length;
+  const totalIssues = Array.from(issueMap.values()).filter(group => scopedIds.has(group.id)).reduce((sum, group) => sum + (group.issues || []).filter(issue => !(issue.types || []).includes('checking')).length, 0);
+  const checkingCount = Array.from(issueMap.values()).filter(group => scopedIds.has(group.id)).reduce((sum, group) => sum + (group.issues || []).filter(issue => (issue.types || []).includes('checking')).length, 0);
   return [
     ['metric', 'value'],
     ['loaded_images', scoped.filter(record => record.imageFile).length],
     ['single_page_viewed', viewed],
     ['error_images', issueCount],
-    ['total_issues', totalIssues]
+    ['total_issues', totalIssues],
+    ['checking', checkingCount]
   ];
 }
 
@@ -5476,10 +5593,12 @@ async function exportCsv() {
   const issueMatrixRows = buildIssueMatrixRows();
   const missingSheet = buildMissingSheet();
   const consisSheet = await buildConsisSheet();
+  const checkingSheet = await buildCheckingSheet();
   downloadXlsx([
     { name: 'issue_check', rows: issueMatrixRows },
     missingSheet,
     consisSheet,
+    checkingSheet,
     { name: 'summary', rows: buildSummaryRows() }
   ], 'bbox_qc_result.xlsx');
 }
@@ -5716,7 +5835,13 @@ async function renderFeedbackCanvas(canvas, record, issue, shapes = [], activeSh
   drawBoxes(ctx, record, drawW, drawH, img.naturalWidth, img.naturalHeight, false);
   drawFeedbackTarget(ctx, record, issue, drawW, drawH, img.naturalWidth, img.naturalHeight);
   ctx.restore();
+  drawIssueArrows(ctx, issue, canvas.width, canvas.height);
   shapes.forEach((shape, index) => drawFeedbackShape(ctx, shape, canvas.width, canvas.height, index === activeShapeIndex));
+}
+
+function drawIssueArrows(ctx, issue, canvasW, canvasH) {
+  const arrows = issue?.arrows || (issue?.arrow ? [issue.arrow] : []);
+  arrows.filter(Boolean).forEach(arrow => drawFeedbackShape(ctx, arrow, canvasW, canvasH, false));
 }
 
 function feedbackTargetBoxIndexesForRecord(record, issue) {
