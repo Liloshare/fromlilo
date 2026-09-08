@@ -2026,6 +2026,7 @@ let missingArrowMode = false;
 let missingArrowDraft = null;
 let missingArrowPending = [];
 let arrowIssueType = 'missing';
+let missingArrowClass = '';
 let arrowIssueColors = { missing: '#ff2d55', checking: '#f59e0b' };
 let suppressCanvasClick = false;
 
@@ -4738,7 +4739,7 @@ async function saveArrowIssue(arrows) {
   const note = document.getElementById('noteInput').value.trim();
   const imageData = await renderArrowIssueImage(record, arrows);
   const type = arrowIssueType || 'missing';
-  const missingClass = type === 'missing' ? (document.getElementById('missingArrowClassSelect')?.value || '') : '';
+  const missingClass = type === 'missing' ? (document.getElementById('missingArrowClassSelect')?.value || missingArrowClass || '') : '';
   upsertIssue(record, {
     target: { type: 'image' },
     targetKey: `image:${type}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
@@ -4761,6 +4762,7 @@ async function saveArrowIssue(arrows) {
 
 async function confirmMissingArrow() {
   const arrows = missingArrowPending.map(arrow => ({ ...arrow }));
+  missingArrowClass = document.getElementById('missingArrowClassSelect')?.value || missingArrowClass || '';
   missingArrowMode = false;
   missingArrowPending = [];
   renderMissingArrowControls(false);
@@ -4772,6 +4774,7 @@ function cancelMissingArrow(shouldRender = true) {
   missingArrowDraft = null;
   missingArrowPending = [];
   arrowIssueType = 'missing';
+  missingArrowClass = '';
   renderMissingArrowControls(false);
   if (shouldRender) renderCurrent();
 }
@@ -4783,7 +4786,7 @@ function renderMissingArrowControls(show) {
   if (!field) return;
   field.classList.toggle('hidden', !show && !missingArrowMode);
   const classSelect = arrowIssueType === 'missing' && show
-    ? `<select id="missingArrowClassSelect" aria-label="MISSING CLASS"><option value="">CLASS</option>${classes.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}</select>`
+    ? `<select id="missingArrowClassSelect" aria-label="MISSING CLASS" onchange="missingArrowClass = this.value"><option value="">CLASS</option>${classes.map(name => `<option value="${escapeHtml(name)}"${name === missingArrowClass ? ' selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select>`
     : '';
   field.innerHTML = show
     ? `<div class="missing-arrow-actions"><span class="hint">Press Enter to save</span>${classSelect}${missingArrowPending.map((_, idx) => `<button type="button" onclick="removePendingArrow(${idx})">× ${idx + 1}</button>`).join('')}<button type="button" class="success" onclick="confirmMissingArrow()">SAVE</button><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
@@ -5070,6 +5073,7 @@ function saveIssueType(type) {
     missingArrowMode = true;
     missingArrowDraft = null;
     missingArrowPending = [];
+    missingArrowClass = '';
     if (type === 'checking') toggleCommentField(true);
     renderMissingArrowControls(false);
     hideIssuePopup();
