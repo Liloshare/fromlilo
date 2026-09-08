@@ -1796,6 +1796,10 @@
                 <div id="actionClassChecks"></div>
               </div>
             </div>
+            <div class="field">
+              <label>REPORT</label>
+              <div class="issue-columns" id="reportChecks"></div>
+            </div>
             <div class="field hidden" id="commentField">
               <label>COMMENT</label>
               <textarea id="noteInput" placeholder="COMMENT"></textarea>
@@ -4823,6 +4827,7 @@ async function copyText(text) {
 
 function buildIssueChecks() {
   const wrap = document.getElementById('issueChecks');
+  const reportWrap = document.getElementById('reportChecks');
   wrap.innerHTML = `
     <div class="issue-column">
       ${issueButtonHtml('wrong_class', 'Class mismatch', 1)}
@@ -4836,6 +4841,8 @@ function buildIssueChecks() {
       ${issueButtonHtml('consis', 'Consis', 5)}
       <button type="button" class="check" id="commentToggleBtn" onclick="toggleCommentField(true)"><span class="issue-num">6</span> Comment</button>
     </div>
+  `;
+  reportWrap.innerHTML = `
     <div class="issue-column">
       <button type="button" class="check" onclick="saveCurrentPass()"><span class="issue-num">7</span> Pass</button>
       ${issueButtonHtml('checking', 'Checking', 8)}
@@ -4882,6 +4889,9 @@ function renderIssuePopover() {
     <div class="issue-column">
       <button type="button" class="check" onclick="saveIssueType('consis')"><span class="issue-num">5</span> Consis</button>
       <button type="button" class="check" onclick="toggleCommentField(true)"><span class="issue-num">6</span> Comment</button>
+    </div>
+    <div class="issue-column">
+      <div class="hint">REPORT</div>
     </div>
     <div class="issue-column">
       <button type="button" class="check" onclick="saveCurrentPass()"><span class="issue-num">7</span> Pass</button>
