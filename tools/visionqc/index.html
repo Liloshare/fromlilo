@@ -4597,12 +4597,13 @@ async function saveArrowIssue(arrows) {
   const note = document.getElementById('noteInput').value.trim();
   const imageData = await renderArrowIssueImage(record, arrows);
   const type = arrowIssueType || 'missing';
+  const missingClass = type === 'missing' ? (document.getElementById('missingArrowClassSelect')?.value || '') : '';
   upsertIssue(record, {
     target: { type: 'image' },
     targetKey: `image:${type}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
     targetLabel: 'IMAGE',
     types: [type],
-    missingClass: '',
+    missingClass,
     note,
     arrow: arrows[0] || null,
     arrows,
@@ -4640,8 +4641,11 @@ function renderMissingArrowControls(show) {
   document.getElementById('checkingIssueBtn')?.classList.toggle('active', (show || missingArrowMode) && arrowIssueType === 'checking');
   if (!field) return;
   field.classList.toggle('hidden', !show && !missingArrowMode);
+  const classSelect = arrowIssueType === 'missing' && show
+    ? `<select id="missingArrowClassSelect" aria-label="MISSING CLASS"><option value="">CLASS</option>${classes.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}</select>`
+    : '';
   field.innerHTML = show
-    ? `<div class="missing-arrow-actions"><span class="hint">Press Enter to save</span>${missingArrowPending.map((_, idx) => `<button type="button" onclick="removePendingArrow(${idx})">× ${idx + 1}</button>`).join('')}<button type="button" class="success" onclick="confirmMissingArrow()">SAVE</button><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
+    ? `<div class="missing-arrow-actions"><span class="hint">Press Enter to save</span>${classSelect}${missingArrowPending.map((_, idx) => `<button type="button" onclick="removePendingArrow(${idx})">× ${idx + 1}</button>`).join('')}<button type="button" class="success" onclick="confirmMissingArrow()">SAVE</button><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
     : missingArrowMode
       ? `<div class="missing-arrow-actions"><span class="hint">Draw arrow on image</span><button type="button" onclick="cancelMissingArrow()">CANCEL</button></div>`
       : '<div id="actionClassChecks"></div>';
