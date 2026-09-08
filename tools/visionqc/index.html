@@ -2015,6 +2015,7 @@ let missingArrowDraft = null;
 let missingArrowPending = [];
 let arrowIssueType = 'missing';
 let arrowIssueColors = { missing: '#ff2d55', checking: '#f59e0b' };
+let suppressCanvasClick = false;
 
 // review-mode ("하나씩 넘기기") navigation queue, snapshot of the filtered list at the
 // moment review mode was entered so marking a record OK/issue doesn't yank it out from
@@ -4572,6 +4573,10 @@ function drawMagnifier(clientX, clientY) {
 }
 
 function handleCanvasObjectSelect(e) {
+  if (suppressCanvasClick) {
+    suppressCanvasClick = false;
+    return;
+  }
   if (missingArrowMode) return;
   if (reviewToolMode !== 'select') return;
   const record = records[currentIndex];
@@ -4612,11 +4617,82 @@ function handleCanvasIssuePopup(e) {
 }
 
 function startMissingArrow(e) {
-  if (!missingArrowMode) return;
+  if (!missingArrowMode) {
+    deleteSavedArrowAtEvent(e);
+    return;
+  }
+  if (deletePendingArrowAtEvent(e)) return;
   e.preventDefault();
   const canvas = document.getElementById('mainCanvas');
   const point = canvasPoint(e, canvas);
   missingArrowDraft = { type: 'arrow', color: arrowIssueColors[arrowIssueType] || '#ff2d55', x1: point.x, y1: point.y, x2: point.x, y2: point.y };
+}
+
+function deletePendingArrowAtEvent(e) {
+  const canvas = document.getElementById('mainCanvas');
+  const point = canvasPoint(e, canvas);
+  const x = point.x * canvas.width;
+  const y = point.y * canvas.height;
+  for (let i = missingArrowPending.length - 1; i >= 0; i--) {
+    const handle = feedbackShapeDeleteHandle(missingArrowPending[i], canvas.width, canvas.height);
+    if (Math.hypot(x - handle.x, y - handle.y) <= handle.r + 6) {
+      e.preventDefault();
+      e.stopPropagation();
+      missingArrowPending.splice(i, 1);
+      missingArrowDraft = null;
+      renderMissingArrowControls(missingArrowPending.length > 0);
+      renderCurrent();
+      return true;
+    }
+  }
+  return false;
+}
+
+async function deleteSavedArrowAtEvent(e) {
+  const record = records[currentIndex];
+  if (!record) return false;
+  const canvas = document.getElementById('mainCanvas');
+  const point = canvasPoint(e, canvas);
+  const hit = savedArrowHandleAtPoint(record, point, canvas);
+  if (!hit) return false;
+
+  e.preventDefault();
+  e.stopPropagation();
+  suppressCanvasClick = true;
+  const issues = getRecordIssue(record)?.issues || [];
+  const issue = issues.find(item => item.targetKey === hit.targetKey);
+  if (!issue) return false;
+  const arrows = (issue.arrows || (issue.arrow ? [issue.arrow] : [])).filter(Boolean);
+  arrows.splice(hit.arrowIndex, 1);
+  if (!arrows.length) {
+    removeIssue(record.id, issue.targetKey);
+  } else {
+    issue.arrow = arrows[0] || null;
+    issue.arrows = arrows;
+    issue.imageData = await renderArrowIssueImage(record, arrows);
+    upsertIssue(record, issue);
+    renderStats();
+    renderIssuesList();
+    updateGalleryHighlights();
+  }
+  await renderCurrent();
+  return true;
+}
+
+function savedArrowHandleAtPoint(record, point, canvas) {
+  const x = point.x * canvas.width;
+  const y = point.y * canvas.height;
+  const issues = getRecordIssue(record)?.issues || [];
+  for (let issueIndex = issues.length - 1; issueIndex >= 0; issueIndex--) {
+    const issue = issues[issueIndex];
+    if (!(issue.types || []).some(type => type === 'missing' || type === 'checking')) continue;
+    const arrows = (issue.arrows || (issue.arrow ? [issue.arrow] : [])).filter(Boolean);
+    for (let arrowIndex = arrows.length - 1; arrowIndex >= 0; arrowIndex--) {
+      const handle = feedbackShapeDeleteHandle(arrows[arrowIndex], canvas.width, canvas.height);
+      if (Math.hypot(x - handle.x, y - handle.y) <= handle.r + 6) return { targetKey: issue.targetKey, arrowIndex };
+    }
+  }
+  return null;
 }
 
 async function previewMissingArrow(e) {
