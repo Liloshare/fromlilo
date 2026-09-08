@@ -3000,14 +3000,16 @@ function readClassInput() {
 
 function autoDetectDuplicateBoxes() {
   records.forEach(record => {
+    record.duplicateAnnotationCount = 0;
     if (record.status !== 'matched' || !record.boxes.length) return;
     const seen = new Map();
     record.boxes.forEach((box, idx) => {
-      const coordKey = [box.xc, box.yc, box.bw, box.bh].join('|');
+      const coordKey = annotationCoordKey(box);
       if (!seen.has(coordKey)) {
         seen.set(coordKey, idx);
         return;
       }
+      record.duplicateAnnotationCount++;
       const firstIdx = seen.get(coordKey);
       const target = { type: 'box', boxIndex: idx, className: box.className };
       upsertIssue(record, {
@@ -3020,6 +3022,18 @@ function autoDetectDuplicateBoxes() {
       }, false);
     });
   });
+}
+
+function annotationCoordKey(box) {
+  if (box.type === 'polygon' && box.points?.length) {
+    return box.points.map(point => `${roundCoord(point.x)},${roundCoord(point.y)}`).join('|');
+  }
+  if (box.type === 'keypoint') return `${roundCoord(box.xc)},${roundCoord(box.yc)}`;
+  return [box.xc, box.yc, box.bw, box.bh].map(roundCoord).join('|');
+}
+
+function roundCoord(value) {
+  return Math.round(Number(value || 0) * 1e8) / 1e8;
 }
 
 async function runValidation() {
@@ -3091,6 +3105,7 @@ async function runValidation() {
       allLabelFiles: labels,
       duplicateImages: Math.max(0, images.length - 1),
       duplicateLabels: Math.max(0, labels.length - 1),
+      duplicateAnnotationCount: 0,
       status,
       boxes: [],
       labelVariants: null,
@@ -3155,7 +3170,7 @@ function hideLoading() {
 }
 
 function isDuplicate(record) {
-  return record.duplicateImages > 0 || record.duplicateLabels > 0;
+  return (record.duplicateAnnotationCount || 0) > 0;
 }
 
 // Immediate parent folder name, used to tell duplicate copies of the same
@@ -3329,13 +3344,13 @@ function renderStats() {
   const scoped = scopedRecords();
   const scopedIds = new Set(scoped.map(r => r.id));
   const matched = scoped.filter(r => r.status === 'matched').length;
-  const zero = scoped.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length;
+  const zero = scoped.filter(r => r.status === 'matched' && r.boxes.length === 0).length;
   const duplicate = scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length;
   const boxes = scoped.reduce((sum, r) => sum + r.boxes.length, 0);
   const reviewed = scoped.filter(r => r.status === 'matched' && reviewedSet.has(r.id) && !issueMap.has(r.id)).length;
   const issueCount = Array.from(issueMap.values()).filter(issue => scopedIds.has(issue.id) && hasErrorIssue(issue)).length;
   const remain = scoped.filter(r => isRemainRecord(r)).length;
-  document.getElementById('statImages').textContent = scoped.filter(r => r.imageFile).length;
+  document.getElementById('statImages').textContent = imageFiles.length;
   document.getElementById('statMatched').textContent = matched;
   document.getElementById('statZero').textContent = zero;
   document.getElementById('statDuplicate').textContent = duplicate;
@@ -3525,6 +3540,10 @@ function duplicateVariantRows() {
     if (r.status !== 'matched' || !isDuplicate(r)) return;
     const haystack = [r.baseName, r.imageFile?.name || '', r.labelFile?.name || ''].join(' ').normalize('NFC').toLowerCase();
     if (q && !haystack.includes(q)) return;
+    if (!r.labelVariants?.length) {
+      rows.push(r);
+      return;
+    }
     (r.labelVariants || []).forEach((variant, i) => {
       rows.push({
         id: `${r.id}__v${i}`,
@@ -4788,8 +4807,7 @@ function renderMeta(record) {
 
   let dupRow = '';
   if (isDuplicate(record)) {
-    const parts = [];
-    if (record.duplicateImages > 0) parts.push(`IMG DUP ${record.duplicateImages + 1}`);
+    const parts = [`ANNO DUP ${record.duplicateAnnotationCount || 0}`];
     if (record.labelVariants) {
       const variantText = record.labelVariants.map(v => `${escapeHtml(v.source)}: ${v.boxCount} BOX`).join('<br>');
       parts.push(variantText);
@@ -5668,8 +5686,8 @@ function exportJson() {
       labels: labelFiles.length,
       matched: scoped.filter(r => r.status === 'matched').length,
       reviewable: reviewable.length,
-      zeroBox: scoped.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).length,
-      duplicateFilenames: scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length,
+      zeroBox: scoped.filter(r => r.status === 'matched' && r.boxes.length === 0).length,
+      duplicateAnnotations: scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length,
       boxes: scoped.reduce((sum, r) => sum + r.boxes.length, 0),
       issues: issueCount,
       reviewed: reviewable.filter(isReviewed).length,
@@ -5684,11 +5702,10 @@ function exportJson() {
       ...(issueMap.get(r.id) || {})
     })),
     unreviewedFiles: reviewable.filter(r => !isReviewed(r)).map(r => r.baseName),
-    zeroBoxFiles: scoped.filter(r => r.status === 'matched' && r.boxes.length === 0 && !isDuplicate(r)).map(r => r.baseName),
+    zeroBoxFiles: scoped.filter(r => r.status === 'matched' && r.boxes.length === 0).map(r => r.baseName),
     duplicateFiles: scoped.filter(r => r.status === 'matched' && isDuplicate(r)).map(r => ({
       file: r.baseName,
-      duplicateImages: r.duplicateImages,
-      duplicateLabels: r.duplicateLabels,
+      duplicateAnnotations: r.duplicateAnnotationCount || 0,
       labelVariants: r.labelVariants
     })),
     missingImages: scoped.filter(r => r.status === 'missing-image').map(r => r.baseName),
@@ -6180,7 +6197,7 @@ function loadImage(file) {
 function statusLabel(record) {
   if (record.status === 'missing-image') return 'NO IMG';
   if (record.status === 'missing-label') return 'NO LBL';
-  if (record.duplicateImages || record.duplicateLabels) return 'DUP';
+  if (isDuplicate(record)) return 'DUP';
   if (record.parseError) return 'LBL ERR';
   return 'MATCH';
 }
