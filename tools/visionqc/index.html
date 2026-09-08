@@ -3079,7 +3079,7 @@ async function runValidation() {
   buildImageMatchIndexes();
   for (const file of labelFiles) {
     if (annotationFormat === 'yolo') {
-      const key = normalizedFilePathStem(file);
+      const key = normalizedStem(file.name);
       if (!labelMap.has(key)) labelMap.set(key, []);
       labelMap.get(key).push(file);
     }
@@ -3089,8 +3089,23 @@ async function runValidation() {
     buildAnnotationMatchIndex();
   }
 
-  let allKeys = new Set([...imageMap.keys(), ...labelMap.keys()]);
-  if (annotationFormat !== 'yolo') {
+  let recordRows = [];
+  if (annotationFormat === 'yolo') {
+    const stems = new Set([...imageStemMap.keys(), ...labelMap.keys()]);
+    Array.from(stems).sort((a, b) => a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' })).forEach(stem => {
+      const images = [...(imageStemMap.get(stem) || [])].sort((a, b) => filePath(a).localeCompare(filePath(b), 'ko', { numeric: true, sensitivity: 'base' }));
+      const labels = [...(labelMap.get(stem) || [])].sort((a, b) => filePath(a).localeCompare(filePath(b), 'ko', { numeric: true, sensitivity: 'base' }));
+      const count = Math.max(images.length, labels.length);
+      for (let i = 0; i < count; i++) {
+        recordRows.push({
+          key: count > 1 ? `${stem}#${i + 1}` : stem,
+          images: images[i] ? [images[i]] : [],
+          labels: labels[i] ? [labels[i]] : []
+        });
+      }
+    });
+  } else {
+    let allKeys = new Set([...imageMap.keys(), ...labelMap.keys()]);
     const matchedImageKeys = new Set();
     labelMap.forEach((_, key) => {
       imagesForKey(key).forEach(file => matchedImageKeys.add(normalizedFilePathStem(file)));
@@ -3099,15 +3114,19 @@ async function runValidation() {
       ...labelMap.keys(),
       ...Array.from(imageMap.keys()).filter(key => !matchedImageKeys.has(key))
     ]);
+    recordRows = Array.from(allKeys).sort((a, b) => a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' })).map(key => {
+      const images = imagesForKey(key);
+      return {
+        key,
+        images,
+        labels: labelMap.get(key) || [],
+        annotationKey: annotationMap.has(key) ? key : (images[0] ? annotationKeyForImageFile(images[0]) : '')
+      };
+    });
   }
-  const sortedKeys = Array.from(allKeys).sort((a, b) => a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' }));
 
-  for (const key of sortedKeys) {
-    const images = imagesForKey(key);
-    const labels = labelMap.get(key) || [];
-    const annotationKey = annotationFormat !== 'yolo'
-      ? (annotationMap.has(key) ? key : (images[0] ? annotationKeyForImageFile(images[0]) : ''))
-      : '';
+  for (const row of recordRows) {
+    const { key, images, labels, annotationKey = '' } = row;
     const status = images.length && labels.length ? 'matched' : images.length ? 'missing-label' : 'missing-image';
     records.push({
       id: key,
