@@ -2586,7 +2586,8 @@ function clearLoadedReviewState() {
 
 function handleImages(files) {
   clearLoadedReviewState();
-  const all = Array.from(files).filter(f => /\.(jpg|jpeg|png)$/i.test(f.name));
+  const rawImages = Array.from(files).filter(f => /\.(jpg|jpeg|png)$/i.test(f.name));
+  const all = uniqueImageFiles(rawImages);
   // If the picked folder contains an "output" subfolder (the finalized image
   // set), only match against those instead of every image under the whole
   // source tree — otherwise unrelated source images bloat the gallery.
@@ -2594,8 +2595,20 @@ function handleImages(files) {
   imageFiles = outputOnly.length ? outputOnly : all;
   imageDrop.classList.add('loaded');
   imageDrop.querySelector('strong').textContent = `IMG ${imageFiles.length}`;
-  imageDrop.querySelector('span').textContent = outputOnly.length ? `OUTPUT / ${all.length}` : 'LOADED';
+  const dedupeText = rawImages.length !== all.length ? ` / DEDUP ${rawImages.length}` : '';
+  imageDrop.querySelector('span').textContent = outputOnly.length ? `OUTPUT / ${all.length}${dedupeText}` : `LOADED${dedupeText}`;
   checkReady();
+}
+
+function uniqueImageFiles(files) {
+  const seen = new Set();
+  return files.filter(file => {
+    const path = filePath(file).normalize('NFC').toLowerCase();
+    const key = `${path}__${file.size || 0}__${file.lastModified || 0}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function handleLabels(files) {
