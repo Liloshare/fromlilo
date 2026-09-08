@@ -1678,7 +1678,7 @@
           <button class="stat filterable" type="button" data-gallery-filter="matched"><div class="num ok" id="statMatched">0</div><div class="label">MATCH</div></button>
           <button class="stat filterable" type="button" data-gallery-filter="zero"><div class="num warn" id="statZero">0</div><div class="label">ZERO</div></button>
           <button class="stat filterable" type="button" data-gallery-filter="duplicate"><div class="num warn" id="statDuplicate">0</div><div class="label">DUP</div></button>
-          <div class="stat"><div class="num" id="statBoxes">0</div><div class="label">BOX</div></div>
+          <button class="stat filterable" type="button" data-gallery-filter="unmatch"><div class="num warn" id="statUnmatch">0</div><div class="label">UNMATCH</div></button>
           <div class="stat-separator"></div>
           <button class="stat filterable" type="button" data-gallery-filter="issue"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></button>
           <button class="stat filterable" type="button" data-gallery-filter="done"><div class="num ok" id="statReviewed">0</div><div class="label">PASS</div></button>
@@ -3359,7 +3359,7 @@ function renderStats() {
   const matched = scoped.filter(r => r.status === 'matched').length;
   const zero = scoped.filter(r => r.status === 'matched' && r.boxes.length === 0).length;
   const duplicate = scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length;
-  const boxes = scoped.reduce((sum, r) => sum + r.boxes.length, 0);
+  const unmatch = scoped.filter(r => r.status === 'missing-image' || r.status === 'missing-label').length;
   const reviewed = scoped.filter(r => r.status === 'matched' && reviewedSet.has(r.id) && !issueMap.has(r.id)).length;
   const issueCount = Array.from(issueMap.values()).filter(issue => scopedIds.has(issue.id) && hasErrorIssue(issue)).length;
   const remain = scoped.filter(r => isRemainRecord(r)).length;
@@ -3367,7 +3367,7 @@ function renderStats() {
   document.getElementById('statMatched').textContent = matched;
   document.getElementById('statZero').textContent = zero;
   document.getElementById('statDuplicate').textContent = duplicate;
-  document.getElementById('statBoxes').textContent = boxes;
+  document.getElementById('statUnmatch').textContent = unmatch;
   document.getElementById('statIssues').textContent = issueCount;
   document.getElementById('statReviewed').textContent = reviewed;
   document.getElementById('statRemain').textContent = remain;
@@ -3488,7 +3488,9 @@ function filteredRecords() {
   const q = document.getElementById('searchInput').value.trim().normalize('NFC').toLowerCase();
   const f = galleryFilter;
   return scopedRecords().filter(r => {
-    if (f === 'all') {
+    if (f === 'unmatch') {
+      if (r.status !== 'missing-image' && r.status !== 'missing-label') return false;
+    } else if (f === 'all') {
       if (!r.imageFile && annotationFormat === 'yolo') return false;
       if (r.status === 'matched' && r.boxes.length === 0) return false;
     } else if (r.status !== 'matched') return false;
@@ -3516,7 +3518,7 @@ function filteredRecords() {
       .normalize('NFC')
       .toLowerCase();
     if (q && !haystack.includes(q)) return false;
-    if (classFilter !== '__all__' && !r.boxes.some(b => b.className === classFilter)) return false;
+    if (f !== 'unmatch' && classFilter !== '__all__' && !r.boxes.some(b => b.className === classFilter)) return false;
     return true;
   });
 }
