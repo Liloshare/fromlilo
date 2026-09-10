@@ -1054,11 +1054,21 @@
       min-height: 0;
       display: grid;
       gap: 12px;
+      grid-auto-rows: minmax(0, 1fr);
     }
-    .feedback-grid.count-1 { grid-template-columns: 1fr; }
-    .feedback-grid.count-2 { grid-template-columns: repeat(2, 1fr); }
+    .feedback-grid.count-1 {
+      grid-template-columns: 1fr;
+      grid-template-rows: minmax(0, 1fr);
+    }
+    .feedback-grid.count-2 {
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: minmax(0, 1fr);
+    }
     .feedback-grid.count-3,
-    .feedback-grid.count-4 { grid-template-columns: repeat(2, 1fr); }
+    .feedback-grid.count-4 {
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+    }
     .feedback-item {
       min-width: 0;
       min-height: 0;
@@ -1092,8 +1102,9 @@
     .feedback-canvas-wrap canvas {
       max-width: 100%;
       max-height: 100%;
-      width: auto;
-      height: auto;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
       display: block;
     }
     .feedback-item-note {
@@ -6125,7 +6136,10 @@ async function renderFeedbackCanvas(canvas, record, issue, shapes = [], activeSh
   const img = await loadImage(record.imageFile);
   ctx.fillStyle = '#151823';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const scale = Math.min(canvas.width / img.naturalWidth, canvas.height / img.naturalHeight);
+  const safePad = 18;
+  const fitW = canvas.width - safePad * 2;
+  const fitH = canvas.height - safePad * 2;
+  const scale = Math.min(fitW / img.naturalWidth, fitH / img.naturalHeight);
   const drawW = Math.round(img.naturalWidth * scale);
   const drawH = Math.round(img.naturalHeight * scale);
   const dx = Math.round((canvas.width - drawW) / 2);
@@ -6136,13 +6150,16 @@ async function renderFeedbackCanvas(canvas, record, issue, shapes = [], activeSh
   drawBoxes(ctx, record, drawW, drawH, img.naturalWidth, img.naturalHeight, false);
   drawFeedbackTarget(ctx, record, issue, drawW, drawH, img.naturalWidth, img.naturalHeight);
   ctx.restore();
-  drawIssueArrows(ctx, issue, canvas.width, canvas.height);
+  drawIssueArrows(ctx, issue, drawW, drawH, dx, dy);
   shapes.forEach((shape, index) => drawFeedbackShape(ctx, shape, canvas.width, canvas.height, index === activeShapeIndex));
 }
 
-function drawIssueArrows(ctx, issue, canvasW, canvasH) {
+function drawIssueArrows(ctx, issue, canvasW, canvasH, offsetX = 0, offsetY = 0) {
   const arrows = issue?.arrows || (issue?.arrow ? [issue.arrow] : []);
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
   arrows.filter(Boolean).forEach(arrow => drawFeedbackShape(ctx, arrow, canvasW, canvasH, false));
+  ctx.restore();
 }
 
 function feedbackTargetBoxIndexesForRecord(record, issue) {
