@@ -1681,6 +1681,7 @@
               <option value="ship_task1">ship_task1</option>
               <option value="ship_task2">ship_task2</option>
               <option value="vehicle_defect">vehicle_defect</option>
+              <option value="archery">archery</option>
             </select>
             <button type="button" onclick="applyClassPreset()">LOAD</button>
           </div>
@@ -1998,6 +1999,14 @@ const CLASS_PRESETS = {
     'switch_pas',
     'switch_svm',
     'table'
+  ],
+  archery: [
+    'Tip',
+    'Body',
+    'Tail',
+    'invi_Tip',
+    'invi_Body',
+    'invi_Tail'
   ]
 };
 const ISSUE_TYPES = [
@@ -2353,14 +2362,30 @@ function normalizedPathToken(value) {
     .toLowerCase();
 }
 
+function isArcheryMode() {
+  return document.getElementById('classPresetSelect')?.value === 'archery';
+}
+
+function archeryBranchlessPathToken(value) {
+  const parts = normalizedPathToken(value).split('/').filter(Boolean);
+  const next = [];
+  for (const part of parts) {
+    const prev = next[next.length - 1] || '';
+    const branchMatch = part.match(/^(.*)\(\d+\)$/);
+    if (branchMatch && branchMatch[1] === prev) continue;
+    next.push(part);
+  }
+  return next.join('/');
+}
+
 function addMapList(map, key, value) {
   if (!key) return;
   if (!map.has(key)) map.set(key, []);
   map.get(key).push(value);
 }
 
-function pathSuffixes(path, minParts = 1) {
-  const parts = normalizedPathToken(path).split('/').filter(Boolean);
+function pathSuffixesFromToken(token, minParts = 1) {
+  const parts = String(token || '').split('/').filter(Boolean);
   const suffixes = [];
   for (let i = 0; i < parts.length; i++) {
     if (parts.length - i >= minParts) suffixes.push(parts.slice(i).join('/'));
@@ -2368,11 +2393,18 @@ function pathSuffixes(path, minParts = 1) {
   return suffixes;
 }
 
+function pathSuffixes(path, minParts = 1) {
+  return pathSuffixesFromToken(normalizedPathToken(path), minParts);
+}
+
 function buildImageMatchIndexes() {
   imagePathSuffixMap = new Map();
   imageStemMap = new Map();
   imageFiles.forEach(file => {
     pathSuffixes(filePath(file)).forEach(suffix => addMapList(imagePathSuffixMap, suffix, file));
+    if (isArcheryMode()) {
+      pathSuffixesFromToken(archeryBranchlessPathToken(filePath(file))).forEach(suffix => addMapList(imagePathSuffixMap, suffix, file));
+    }
     addMapList(imageStemMap, normalizedStem(file.name), file);
   });
 }
@@ -2384,6 +2416,11 @@ function buildAnnotationMatchIndex() {
     pathSuffixes(key, minParts).forEach(suffix => {
       if (!annotationPathSuffixMap.has(suffix)) annotationPathSuffixMap.set(suffix, key);
     });
+    if (isArcheryMode()) {
+      pathSuffixesFromToken(archeryBranchlessPathToken(key), minParts).forEach(suffix => {
+        if (!annotationPathSuffixMap.has(suffix)) annotationPathSuffixMap.set(suffix, key);
+      });
+    }
   });
 }
 
@@ -2413,7 +2450,12 @@ function imagesForKey(key) {
     }
     return candidates;
   }
-  if (/[\\/]/.test(String(key || ''))) return imagePathSuffixMap.get(normalizedPathToken(key)) || [];
+  if (/[\\/]/.test(String(key || ''))) {
+    const exactPath = imagePathSuffixMap.get(normalizedPathToken(key)) || [];
+    if (exactPath.length) return exactPath;
+    if (isArcheryMode()) return imagePathSuffixMap.get(archeryBranchlessPathToken(key)) || [];
+    return [];
+  }
   return imageStemMap.get(normalizedStem(key)) || [];
 }
 
