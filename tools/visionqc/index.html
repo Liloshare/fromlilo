@@ -454,6 +454,108 @@
     }
     .viewer-main { min-width: 0; position: relative; }
     .viewer-side { display: grid; gap: 10px; align-content: start; position: relative; }
+    .feedback-drawer {
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      min-width: 0;
+      width: 360px;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+    .feedback-drawer.collapsed {
+      width: 38px;
+    }
+    .feedback-drawer.collapsed .feedback-drawer-body,
+    .feedback-drawer.collapsed .feedback-drawer-title,
+    .feedback-drawer.collapsed .feedback-sort {
+      display: none;
+    }
+    .feedback-drawer-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    .feedback-drawer-title {
+      flex: 1 1 auto;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .feedback-sort {
+      width: 120px;
+      min-height: 28px;
+      padding: 4px 7px;
+      font-size: 11px;
+    }
+    .feedback-drawer-body {
+      overflow: auto;
+      padding: 8px;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+    .feedback-mini-tools {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .feedback-mini-tools button.active {
+      background: var(--text);
+      color: var(--bg);
+      border-color: var(--text);
+    }
+    .feedback-mini-page {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      display: grid;
+      gap: 6px;
+      padding: 7px;
+    }
+    .feedback-mini-page.active {
+      border-color: var(--text);
+      box-shadow: 0 0 0 1px var(--text);
+    }
+    .feedback-mini-canvas {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #111827;
+      display: block;
+      cursor: crosshair;
+    }
+    .feedback-mini-meta {
+      display: grid;
+      gap: 3px;
+      font-size: 10px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    .feedback-mini-row {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 5px;
+      align-items: center;
+      font-size: 10px;
+    }
+    .feedback-mini-row input,
+    .feedback-mini-row textarea {
+      min-height: 26px;
+      padding: 4px 6px;
+      font-size: 11px;
+    }
+    .feedback-mini-row textarea {
+      min-height: 46px;
+    }
+    .feedback-mini-actions {
+      display: flex;
+      gap: 6px;
+    }
+    .feedback-mini-actions button {
+      min-height: 28px;
+      padding: 4px 7px;
+      font-size: 11px;
+    }
     .canvas-frame {
       border: 1px solid var(--line);
       border-radius: var(--radius);
@@ -574,10 +676,11 @@
       padding: 12px;
     }
     .panel.viewer-fullscreen .viewer {
-      grid-template-columns: 1fr 360px;
+      grid-template-columns: minmax(0, 1fr) 360px auto;
       height: 100%;
       min-height: 0;
     }
+    .panel.viewer-fullscreen .feedback-drawer:not(.collapsed) { width: 420px; }
     .panel.viewer-fullscreen .viewer-main {
       height: 100%;
       display: flex;
@@ -960,6 +1063,83 @@
       padding: 24px;
       break-after: page;
       page-break-after: always;
+    }
+    .feedback-divider-slide {
+      grid-template-columns: 1fr;
+      place-items: center;
+      background:
+        radial-gradient(circle at 75% 80%, rgba(25, 70, 170, .45), transparent 34%),
+        linear-gradient(135deg, #03040c 0%, #0b0b20 48%, #111a3e 100%);
+      color: #fff;
+      border: 0;
+    }
+    .feedback-divider-slide h1 {
+      margin: 0;
+      font-size: 44px;
+      line-height: 1.1;
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+    .feedback-guide-slide {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 76px 90px minmax(0, 1fr);
+      gap: 8px;
+      background: #fff;
+      color: #111;
+    }
+    .guide-meta {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 88px;
+      gap: 10px;
+      font-size: 11px;
+      color: #555;
+      font-weight: 800;
+    }
+    .guide-meta div,
+    .guide-qa {
+      background: #e9e9e9;
+      padding: 8px 10px;
+      overflow-wrap: anywhere;
+    }
+    .guide-qa {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 8px;
+      align-items: start;
+      font-size: 18px;
+      line-height: 1.25;
+      color: #111;
+    }
+    .guide-images {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .guide-images > div {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid #555;
+      background: #e9e9e9;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .guide-images h3 {
+      position: absolute;
+      top: 8px;
+      left: 12px;
+      margin: 0;
+      color: #666;
+      font-size: 20px;
+      z-index: 1;
+    }
+    .guide-images canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
     }
     .feedback-sidebar {
       position: sticky;
@@ -1705,7 +1885,6 @@
           <button class="stat filterable" type="button" data-gallery-filter="unmatch"><div class="num warn" id="statUnmatch">0</div><div class="label">UNMATCH</div></button>
           <div class="stat-separator"></div>
           <button class="stat filterable" type="button" data-gallery-filter="issue"><div class="num err" id="statIssues">0</div><div class="label">ISSUE</div></button>
-          <button class="stat filterable" type="button" data-gallery-filter="done"><div class="num ok" id="statReviewed">0</div><div class="label">PASS</div></button>
           <button class="stat filterable" type="button" data-gallery-filter="remain"><div class="num warn" id="statRemain">0</div><div class="label">REMAIN</div></button>
           <div class="stat"><div class="num" id="statProgress">0%</div><div class="label">RATE</div></div>
         </div>
@@ -1746,7 +1925,6 @@
             <option value="">ISSUE</option>
           </select>
           <button type="button" id="bulkIssueSaveBtn">SAVE ISSUE</button>
-          <button type="button" id="bulkPassBtn">PASS</button>
           <span class="bulk-selected-count" id="bulkSelectedCount">0 SELECT</span>
         </div>
         <div class="pager-actions">
@@ -1836,6 +2014,30 @@
             <div class="issues-list" id="issuesList"></div>
           </div>
         </div>
+
+        <aside class="feedback-drawer collapsed" id="feedbackDrawer">
+          <div class="feedback-drawer-head">
+            <button type="button" onclick="toggleFeedbackDrawer()" id="feedbackDrawerToggle" title="FEEDBACK">◀</button>
+            <div class="feedback-drawer-title">FEEDBACK DOC</div>
+            <select class="feedback-sort" id="feedbackSortMode" onchange="renderFeedbackDrawer();">
+              <option value="class">CLASS</option>
+              <option value="type">ISSUE TYPE</option>
+            </select>
+          </div>
+          <div class="feedback-drawer-body">
+            <div class="feedback-mini-tools">
+              <button type="button" data-mini-tool="select" onclick="setFeedbackMiniTool('select')">SELECT</button>
+              <button type="button" data-mini-tool="arrow" onclick="setFeedbackMiniTool('arrow')">ARROW</button>
+              <button type="button" data-mini-tool="text" onclick="setFeedbackMiniTool('text')">TEXT</button>
+            </div>
+            <div class="feedback-mini-actions">
+              <button type="button" onclick="addFeedbackDocPage()">+ PAGE</button>
+              <button type="button" onclick="openFeedbackDeck()">DOWNLOAD</button>
+            </div>
+            <div class="hint">선택 객체가 있으면 그 영역을 크롭합니다.</div>
+            <div id="feedbackMiniPages"></div>
+          </div>
+        </aside>
       </div>
     </section>
   </main>
@@ -2294,7 +2496,6 @@ document.getElementById('galleryColumnsSelect').addEventListener('change', e => 
   applyGalleryColumns();
 });
 document.getElementById('bulkIssueSaveBtn').addEventListener('click', saveBulkIssue);
-document.getElementById('bulkPassBtn').addEventListener('click', saveBulkPass);
 document.addEventListener('pointerup', () => {
   bulkDragActive = false;
 });
@@ -2634,6 +2835,8 @@ function clearLoadedReviewState() {
   feedbackActive = null;
   feedbackDraft = null;
   feedbackMoveDraft = null;
+  feedbackDocPages = [];
+  feedbackDocActive = -1;
   excelFilterNames = new Set();
   sampleMode = 'all';
   sampleIds = new Set();
@@ -3501,7 +3704,7 @@ function renderStats() {
   document.getElementById('statDuplicate').textContent = duplicate;
   document.getElementById('statUnmatch').textContent = unmatch;
   document.getElementById('statIssues').textContent = issueCount;
-  document.getElementById('statReviewed').textContent = reviewed;
+  if (document.getElementById('statReviewed')) document.getElementById('statReviewed').textContent = reviewed;
   document.getElementById('statRemain').textContent = remain;
   document.getElementById('statProgress').textContent = matched ? `${Math.round(reviewed / matched * 100)}%` : '0%';
   document.querySelectorAll('[data-gallery-filter]').forEach(btn => {
@@ -3598,7 +3801,7 @@ function renderMissingClassOptions() {
 
 function setClassFilter(value) {
   classFilter = value;
-  visibleClasses = value === '__all__' ? new Set(classes) : new Set([value]);
+  visibleClasses = new Set(classes);
   galleryPage = 0;
   renderClassControls();
   renderGallery();
@@ -3873,37 +4076,6 @@ function saveBulkIssue() {
   renderGallery();
 }
 
-function saveBulkPass() {
-  const ids = Array.from(bulkSelectedIds);
-  if (!ids.length) return;
-  ids.forEach(id => {
-    const record = records.find(item => item.id === id);
-    if (!record || record.isVariant) return;
-    issueMap.delete(record.id);
-    reviewedSet.add(record.id);
-    saveReviewResult(record, 'approved');
-  });
-  bulkSelectedIds.clear();
-  renderStats();
-  renderIssuesList();
-  updateGalleryHighlights();
-  renderGallery();
-}
-
-function saveCurrentPass() {
-  const record = records[currentIndex];
-  if (!record || record.isVariant) return;
-  issueMap.delete(record.id);
-  reviewedSet.add(record.id);
-  saveReviewResult(record, 'approved');
-  resetIssueDraft();
-  renderStats();
-  renderIssuesList();
-  updateGalleryHighlights();
-  hideIssuePopup();
-  renderCurrent();
-}
-
 function updateGalleryPager(total, visible, totalPages) {
   const info = document.getElementById('pageInfo');
   const bottomInfo = document.getElementById('pageInfoBottom');
@@ -4054,6 +4226,7 @@ function selectRecord(index) {
   renderStats();
   updateGalleryHighlights();
   updatePosCounter();
+  renderFeedbackDrawer();
   renderCurrent();
   prefetchNeighbors(index);
 }
@@ -4172,12 +4345,14 @@ async function renderCurrent() {
     boxList.innerHTML = '';
     if (boxSummary) boxSummary.textContent = '';
     document.getElementById('metaTable').innerHTML = '<div class="meta-row"><div class="meta-key">FILE</div><div class="meta-val">EMPTY</div></div>';
+    renderFeedbackDrawer();
     return;
   }
   const size = mainCanvasFitSize();
   await renderCanvas(canvas, record, size.width, true, size.height);
   magnifierImg = record.imageFile ? await loadImage(record.imageFile) : null;
   renderMeta(record);
+  renderFeedbackDrawer();
   if (boxSummary) boxSummary.textContent = `(${record.boxes.length})`;
   boxList.innerHTML = record.boxes.length ? '' : '<div class="hint">NO BOX</div>';
   const groups = new Map();
@@ -4334,12 +4509,15 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
   const scaleX = canvasW / imgW;
   const scaleY = canvasH / imgH;
   const legendClasses = new Set();
+  const labelAnchors = new Map();
   record.boxes.forEach((box, idx) => {
     if (!classSet.has(box.className)) return;
     legendClasses.add(box.className);
     const color = classColors[box.className] || '#a8a4bd';
     const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
-    ctx.globalAlpha = isMain ? 0.08 : 0.14;
+    const isFilteredClass = classFilter !== '__all__' && box.className === classFilter;
+    const isDimmedByFilter = classFilter !== '__all__' && box.className !== classFilter;
+    ctx.globalAlpha = isDimmedByFilter ? 0.035 : (isMain ? 0.08 : 0.14);
     ctx.fillStyle = color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.fill();
@@ -4349,13 +4527,13 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
       ctx.fill();
     }
     else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = isDimmedByFilter ? 0.32 : 1;
     const canShowSelection = record === records[currentIndex];
     const isActive = canShowSelection && (idx === activeBoxIndex || selectedBoxIndices.has(idx));
     ctx.shadowColor = color;
-    ctx.shadowBlur = isActive ? 16 : 10;
+    ctx.shadowBlur = isActive || isFilteredClass ? 16 : 10;
     const baseLineWidth = classLineWidths[box.className] || 2;
-    ctx.lineWidth = isActive ? Math.min(5, baseLineWidth + 1) : baseLineWidth;
+    ctx.lineWidth = isActive || isFilteredClass ? Math.min(5, baseLineWidth + 1) : baseLineWidth;
     ctx.strokeStyle = isActive ? '#ffffff' : color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.stroke();
@@ -4381,8 +4559,38 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     }
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
+    if (isMain && !labelAnchors.has(box.className)) {
+      labelAnchors.set(box.className, {
+        x: Math.max(2, Math.min(canvasW - 10, rect.x || box.xc * imgW * scaleX)),
+        y: Math.max(14, Math.min(canvasH - 4, (rect.y || box.yc * imgH * scaleY) - 4)),
+        color
+      });
+    }
   });
+  if (isMain) drawClassNameTags(ctx, labelAnchors, canvasW);
   if (isMain) drawOverlayLegend(ctx, record, Array.from(legendClasses), canvasW);
+  ctx.restore();
+}
+
+function drawClassNameTags(ctx, anchors, canvasW) {
+  if (!anchors.size) return;
+  const fontSize = Math.max(9, Math.round(canvasW / 160));
+  ctx.save();
+  ctx.font = `700 ${fontSize}px "Courier New", monospace`;
+  anchors.forEach((info, name) => {
+    const text = String(name || '');
+    const padX = 5;
+    const w = Math.min(canvasW - 4, ctx.measureText(text).width + padX * 2);
+    const h = fontSize + 6;
+    const x = Math.max(2, Math.min(canvasW - w - 2, info.x));
+    const y = Math.max(h + 2, info.y);
+    ctx.globalAlpha = classFilter !== '__all__' && name !== classFilter ? 0.58 : 0.9;
+    ctx.fillStyle = info.color || '#111827';
+    ctx.fillRect(x, y - h, w, h);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, x + padX, y - 5);
+  });
   ctx.restore();
 }
 
@@ -5090,7 +5298,6 @@ function buildIssueChecks() {
   `;
   reportWrap.innerHTML = `
     <div class="issue-column">
-      <button type="button" class="check" onclick="saveCurrentPass()"><span class="issue-num">7</span> Pass</button>
       ${issueButtonHtml('checking', 'Checking', 8)}
     </div>
   `;
@@ -5141,7 +5348,6 @@ function renderIssuePopover() {
       <div class="hint">REPORT</div>
     </div>
     <div class="issue-column">
-      <button type="button" class="check" onclick="saveCurrentPass()"><span class="issue-num">7</span> Pass</button>
       <button type="button" class="check" onclick="saveIssueType('checking')"><span class="issue-num">8</span> Checking</button>
     </div>
   `;
@@ -5219,10 +5425,6 @@ function handleIssueShortcut(number) {
   };
   if (number === 6) {
     toggleCommentField(true);
-    return;
-  }
-  if (number === 7) {
-    saveCurrentPass();
     return;
   }
   if (shortcuts[number]) saveIssueType(shortcuts[number]);
@@ -6059,10 +6261,16 @@ let feedbackTool = 'rect';
 let feedbackActive = null;
 let feedbackDraft = null;
 let feedbackMoveDraft = null;
+let feedbackDocPages = [];
+let feedbackDocActive = -1;
+let feedbackMiniTool = 'arrow';
+let feedbackMiniDraft = null;
+let feedbackDrawerCollapsed = true;
 const FEEDBACK_TOOL_COLORS = {
   rect: '#ff2d55',
   circle: '#2563eb',
-  arrow: '#16a34a'
+  arrow: '#16a34a',
+  text: '#111827'
 };
 
 function buildFeedbackSlides(rows) {
@@ -6090,6 +6298,233 @@ function buildFeedbackSlides(rows) {
     }
   });
   return slides;
+}
+
+function toggleFeedbackDrawer(forceOpen) {
+  feedbackDrawerCollapsed = typeof forceOpen === 'boolean' ? !forceOpen : !feedbackDrawerCollapsed;
+  const drawer = document.getElementById('feedbackDrawer');
+  drawer?.classList.toggle('collapsed', feedbackDrawerCollapsed);
+  const toggle = document.getElementById('feedbackDrawerToggle');
+  if (toggle) toggle.textContent = feedbackDrawerCollapsed ? '◀' : '▶';
+  if (!feedbackDrawerCollapsed) renderFeedbackDrawer();
+}
+
+function setFeedbackMiniTool(tool) {
+  feedbackMiniTool = tool || 'arrow';
+  document.querySelectorAll('[data-mini-tool]').forEach(btn => btn.classList.toggle('active', btn.dataset.miniTool === feedbackMiniTool));
+}
+
+function currentFeedbackGroup(record) {
+  const issues = record ? (getRecordIssue(record)?.issues || []) : [];
+  const first = issues[0] || null;
+  const type = first?.types?.[0] || 'checking';
+  const selected = Array.from(selectedBoxIndices)[0] ?? activeBoxIndex;
+  const cls = selected >= 0 ? record.boxes[selected]?.className : (first?.missingClass || type);
+  return { type, className: cls || type };
+}
+
+function selectedCropForRecord(record) {
+  const idx = Array.from(selectedBoxIndices)[0] ?? activeBoxIndex;
+  const box = record?.boxes?.[idx];
+  if (!box || box.type === 'keypoint') return { x: 0, y: 0, w: 1, h: 1 };
+  const pad = 0.12;
+  const x = Math.max(0, box.xc - box.bw / 2 - pad);
+  const y = Math.max(0, box.yc - box.bh / 2 - pad);
+  const w = Math.min(1 - x, box.bw + pad * 2);
+  const h = Math.min(1 - y, box.bh + pad * 2);
+  return { x, y, w, h };
+}
+
+function addFeedbackDocPage() {
+  const record = records[currentIndex];
+  if (!record?.imageFile) return;
+  const group = currentFeedbackGroup(record);
+  const page = {
+    id: `fbdoc:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+    recordId: record.id,
+    path: recordFolderPath(record, 2),
+    file: record.baseName,
+    imagePath: recordDisplayPath(record),
+    frame: currentIndex + 1,
+    className: group.className,
+    issueType: group.type,
+    question: '',
+    answer: '',
+    note: '',
+    crop: selectedCropForRecord(record),
+    shapes: []
+  };
+  feedbackDocPages.push(page);
+  feedbackDocActive = feedbackDocPages.length - 1;
+  toggleFeedbackDrawer(true);
+  renderFeedbackDrawer();
+}
+
+function sortedFeedbackDocPages() {
+  const mode = document.getElementById('feedbackSortMode')?.value || 'class';
+  return feedbackDocPages.map((page, index) => ({ page, index })).sort((a, b) => {
+    const ak = mode === 'type' ? a.page.issueType : a.page.className;
+    const bk = mode === 'type' ? b.page.issueType : b.page.className;
+    return String(ak || '').localeCompare(String(bk || ''), 'ko', { numeric: true, sensitivity: 'base' }) || a.index - b.index;
+  });
+}
+
+function renderFeedbackDrawer() {
+  setFeedbackMiniTool(feedbackMiniTool);
+  const wrap = document.getElementById('feedbackMiniPages');
+  if (!wrap) return;
+  const rows = sortedFeedbackDocPages();
+  wrap.innerHTML = rows.length ? rows.map(({ page, index }) => `
+    <div class="feedback-mini-page ${index === feedbackDocActive ? 'active' : ''}" data-doc-index="${index}">
+      <canvas class="feedback-mini-canvas" data-doc-canvas="${index}"></canvas>
+      <div class="feedback-mini-meta">
+        <b>${escapeHtml(page.className || page.issueType)}</b>
+        <span>${escapeHtml(page.path)}</span>
+        <span>${escapeHtml(page.file)}</span>
+      </div>
+      <label class="feedback-mini-row"><span>CLASS</span><input value="${escapeHtml(page.className)}" data-doc-field="className"></label>
+      <label class="feedback-mini-row"><span>TYPE</span><input value="${escapeHtml(page.issueType)}" data-doc-field="issueType"></label>
+      <label class="feedback-mini-row"><span>Q</span><textarea data-doc-field="question">${escapeHtml(page.question)}</textarea></label>
+      <label class="feedback-mini-row"><span>A</span><textarea data-doc-field="answer">${escapeHtml(page.answer)}</textarea></label>
+      <div class="feedback-mini-actions">
+        <button type="button" data-doc-delete="${index}">DELETE</button>
+      </div>
+    </div>
+  `).join('') : '<div class="hint">+ PAGE로 현재 검수 이미지를 추가하세요.</div>';
+  wrap.querySelectorAll('[data-doc-index]').forEach(card => {
+    const index = Number(card.dataset.docIndex);
+    card.addEventListener('click', event => {
+      if (event.target.matches('input, textarea, button, canvas')) return;
+      feedbackDocActive = index;
+      renderFeedbackDrawer();
+    });
+  });
+  wrap.querySelectorAll('[data-doc-field]').forEach(input => {
+    input.addEventListener('input', () => {
+      const card = input.closest('[data-doc-index]');
+      const page = feedbackDocPages[Number(card?.dataset.docIndex)];
+      if (!page) return;
+      page[input.dataset.docField] = input.value;
+    });
+  });
+  wrap.querySelectorAll('[data-doc-delete]').forEach(btn => {
+    btn.addEventListener('click', event => {
+      event.stopPropagation();
+      feedbackDocPages.splice(Number(btn.dataset.docDelete), 1);
+      feedbackDocActive = Math.min(feedbackDocActive, feedbackDocPages.length - 1);
+      renderFeedbackDrawer();
+    });
+  });
+  wrap.querySelectorAll('[data-doc-canvas]').forEach(canvas => {
+    attachFeedbackDocCanvasEvents(canvas);
+    redrawFeedbackDocCanvas(canvas);
+  });
+}
+
+async function redrawFeedbackDocCanvas(canvas) {
+  const page = feedbackDocPages[Number(canvas.dataset.docCanvas)];
+  if (!page) return;
+  const record = records.find(item => item.id === page.recordId);
+  if (!record?.imageFile) return;
+  canvas.width = 960;
+  canvas.height = 540;
+  const ctx = canvas.getContext('2d');
+  await drawFeedbackDocImage(ctx, record, page, canvas.width, canvas.height, true);
+}
+
+async function drawFeedbackDocImage(ctx, record, page, canvasW, canvasH, withHandles = false) {
+  const img = await loadImage(record.imageFile);
+  ctx.fillStyle = '#e9e9e9';
+  ctx.fillRect(0, 0, canvasW, canvasH);
+  const crop = page.crop || { x: 0, y: 0, w: 1, h: 1 };
+  const sx = crop.x * img.naturalWidth;
+  const sy = crop.y * img.naturalHeight;
+  const sw = crop.w * img.naturalWidth;
+  const sh = crop.h * img.naturalHeight;
+  const scale = Math.min(canvasW / sw, canvasH / sh);
+  const dw = Math.round(sw * scale);
+  const dh = Math.round(sh * scale);
+  const dx = Math.round((canvasW - dw) / 2);
+  const dy = Math.round((canvasH - dh) / 2);
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  drawFeedbackDocOriginalLabels(ctx, record, crop, dx, dy, dw, dh);
+  (page.shapes || []).forEach(shape => drawFeedbackShape(ctx, shape, canvasW, canvasH, false, withHandles));
+  if (!withHandles) return;
+}
+
+function drawFeedbackDocOriginalLabels(ctx, record, crop, dx, dy, dw, dh) {
+  ctx.save();
+  record.boxes.forEach(box => {
+    const color = classColors[box.className] || '#ff2d55';
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = 'rgba(0,0,0,.28)';
+    ctx.shadowBlur = 4;
+    if (box.type === 'polygon' && box.points?.length) {
+      ctx.beginPath();
+      box.points.forEach((point, idx) => {
+        const x = dx + ((point.x - crop.x) / crop.w) * dw;
+        const y = dy + ((point.y - crop.y) / crop.h) * dh;
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.closePath();
+      ctx.stroke();
+    } else if (box.type === 'keypoint') {
+      const x = dx + ((box.xc - crop.x) / crop.w) * dw;
+      const y = dy + ((box.yc - crop.y) / crop.h) * dh;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(3, dw / 260), 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      const x = dx + ((box.xc - box.bw / 2 - crop.x) / crop.w) * dw;
+      const y = dy + ((box.yc - box.bh / 2 - crop.y) / crop.h) * dh;
+      const w = box.bw / crop.w * dw;
+      const h = box.bh / crop.h * dh;
+      ctx.strokeRect(x, y, w, h);
+    }
+  });
+  ctx.restore();
+}
+
+function attachFeedbackDocCanvasEvents(canvas) {
+  if (canvas.dataset.ready) return;
+  canvas.dataset.ready = '1';
+  canvas.addEventListener('pointerdown', event => {
+    const pageIndex = Number(canvas.dataset.docCanvas);
+    const page = feedbackDocPages[pageIndex];
+    if (!page) return;
+    feedbackDocActive = pageIndex;
+    const point = canvasPoint(event, canvas);
+    if (feedbackMiniTool === 'text') {
+      const text = window.prompt('TEXT');
+      if (text) {
+        page.shapes.push({ type: 'text', text, color: '#111827', x1: point.x, y1: point.y, x2: point.x, y2: point.y });
+        redrawFeedbackDocCanvas(canvas);
+      }
+      return;
+    }
+    if (feedbackMiniTool !== 'arrow') return;
+    feedbackMiniDraft = { canvas, pageIndex, shape: { type: 'arrow', color: '#ff2d55', x1: point.x, y1: point.y, x2: point.x, y2: point.y } };
+    canvas.setPointerCapture(event.pointerId);
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!feedbackMiniDraft || feedbackMiniDraft.canvas !== canvas) return;
+    const point = canvasPoint(event, canvas);
+    feedbackMiniDraft.shape.x2 = point.x;
+    feedbackMiniDraft.shape.y2 = point.y;
+    redrawFeedbackDocCanvas(canvas).then(() => drawFeedbackShape(canvas.getContext('2d'), feedbackMiniDraft.shape, canvas.width, canvas.height, true));
+  });
+  canvas.addEventListener('pointerup', event => {
+    if (!feedbackMiniDraft || feedbackMiniDraft.canvas !== canvas) return;
+    const page = feedbackDocPages[feedbackMiniDraft.pageIndex];
+    const shape = feedbackMiniDraft.shape;
+    feedbackMiniDraft = null;
+    if (page && (Math.abs(shape.x2 - shape.x1) > 0.01 || Math.abs(shape.y2 - shape.y1) > 0.01)) page.shapes.push(shape);
+    canvas.releasePointerCapture(event.pointerId);
+    redrawFeedbackDocCanvas(canvas);
+  });
 }
 
 function setFeedbackTool(tool) {
@@ -6151,6 +6586,52 @@ async function openFeedbackDeck() {
     for (const canvas of slide.querySelectorAll('canvas')) {
       attachFeedbackCanvasEvents(canvas);
       await redrawFeedbackCanvas(canvas);
+    }
+  }
+  await appendFeedbackDocSlides(deck);
+  const totalPages = deck.querySelectorAll('.feedback-slide').length;
+  document.getElementById('feedbackCount').textContent = `${totalPages} PAGES / ${rows.length + feedbackDocPages.length} ITEMS`;
+}
+
+async function appendFeedbackDocSlides(deck) {
+  const sorted = sortedFeedbackDocPages();
+  let lastGroup = '';
+  let pageNo = deck.querySelectorAll('.feedback-slide').length;
+  for (const { page } of sorted) {
+    const group = (document.getElementById('feedbackSortMode')?.value || 'class') === 'type' ? page.issueType : page.className;
+    if (group !== lastGroup) {
+      pageNo++;
+      const divider = document.createElement('section');
+      divider.className = 'feedback-slide feedback-divider-slide';
+      divider.innerHTML = `<h1>${escapeHtml(group || 'Class')}</h1>`;
+      deck.appendChild(divider);
+      lastGroup = group;
+    }
+    pageNo++;
+    const slide = document.createElement('section');
+    slide.className = 'feedback-slide feedback-guide-slide';
+    slide.innerHTML = `
+      <div class="guide-meta">
+        <div><b>Image name:</b> ${escapeHtml(page.file)}</div>
+        <div><b>LINK:</b> ${escapeHtml(page.path)}</div>
+        <div><b>Frame:</b> ${escapeHtml(page.frame)}</div>
+      </div>
+      <div class="guide-qa"><b>Q</b><span>${escapeHtml(page.question || page.issueType || '')}</span></div>
+      <div class="guide-qa"><b>A</b><span>${escapeHtml(page.answer || page.note || '')}</span></div>
+      <div class="guide-images">
+        <div><h3>BEFORE</h3><canvas data-doc-before="${escapeHtml(page.id)}"></canvas></div>
+        <div><h3>AFTER</h3><canvas data-doc-after="${escapeHtml(page.id)}"></canvas></div>
+      </div>
+    `;
+    deck.appendChild(slide);
+    const record = records.find(item => item.id === page.recordId);
+    if (record?.imageFile) {
+      const before = slide.querySelector('[data-doc-before]');
+      const after = slide.querySelector('[data-doc-after]');
+      before.width = after.width = 720;
+      before.height = after.height = 460;
+      await drawFeedbackDocImage(before.getContext('2d'), record, { ...page, shapes: [] }, before.width, before.height, false);
+      await drawFeedbackDocImage(after.getContext('2d'), record, page, after.width, after.height, false);
     }
   }
 }
@@ -6243,7 +6724,7 @@ function drawFeedbackTarget(ctx, record, issue, canvasW, canvasH, imgW, imgH) {
   ctx.restore();
 }
 
-function drawFeedbackShape(ctx, shape, canvasW, canvasH, active = false) {
+function drawFeedbackShape(ctx, shape, canvasW, canvasH, active = false, showHandle = true) {
   const x1 = shape.x1 * canvasW;
   const y1 = shape.y1 * canvasH;
   const x2 = shape.x2 * canvasW;
@@ -6274,9 +6755,20 @@ function drawFeedbackShape(ctx, shape, canvasW, canvasH, active = false) {
     ctx.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
     ctx.closePath();
     ctx.fill();
+  } else if (shape.type === 'text') {
+    const text = String(shape.text || '');
+    ctx.font = `700 ${Math.max(18, Math.round(canvasW / 42))}px system-ui, sans-serif`;
+    const w = Math.min(canvasW - x1 - 12, ctx.measureText(text).width + 18);
+    const h = Math.max(30, Math.round(canvasW / 34));
+    ctx.globalAlpha = 0.88;
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.fillRect(x1, y1 - h + 8, w, h);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = color;
+    ctx.fillText(text, x1 + 9, y1);
   }
   ctx.restore();
-  drawFeedbackDeleteHandle(ctx, shape, canvasW, canvasH);
+  if (showHandle && shape.type !== 'text') drawFeedbackDeleteHandle(ctx, shape, canvasW, canvasH);
 }
 
 function drawFeedbackDeleteHandle(ctx, shape, canvasW, canvasH) {
@@ -6551,6 +7043,8 @@ function resetAll() {
   galleryPage = 0;
   lastGalleryRows = [];
   consistencyRows = [];
+  feedbackDocPages = [];
+  feedbackDocActive = -1;
   bulkSelectedIds.clear();
   excelFilterNames = new Set();
   sampleMode = 'all';
