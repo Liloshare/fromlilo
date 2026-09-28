@@ -2587,13 +2587,33 @@ function archerySplitSessionPathToken(value) {
   return String(value || '').replace(/(\d{4}-\d{2}-\d{2})__(\d{2}-\d{2}-\d{2}_\d+)/g, '$1/$2');
 }
 
+function archeryCollapsedSessionBranchToken(value) {
+  const parts = normalizedPathToken(value).split('/').filter(Boolean);
+  const next = [];
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    const following = parts[i + 1] || '';
+    const previousDate = next[next.length - 2] || '';
+    const previousSession = next[next.length - 1] || '';
+    const sessionBranch = following.match(/^(.*)\(\d+\)$/);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(part) && part === previousDate && sessionBranch?.[1] === previousSession) {
+      i += 1;
+      continue;
+    }
+    next.push(part);
+  }
+  return next.join('/');
+}
+
 function archeryPathAliasTokens(value) {
   const base = normalizedPathToken(value);
+  const splitSession = archerySplitSessionPathToken(base);
   const candidates = [
     base,
     archeryBranchlessPathToken(base),
-    archerySplitSessionPathToken(base),
-    archeryBranchlessPathToken(archerySplitSessionPathToken(base))
+    splitSession,
+    archeryBranchlessPathToken(splitSession),
+    archeryCollapsedSessionBranchToken(splitSession)
   ];
   return Array.from(new Set(candidates.filter(Boolean)));
 }
@@ -2617,6 +2637,15 @@ function pathSuffixes(path, minParts = 1) {
   return pathSuffixesFromToken(normalizedPathToken(path), minParts);
 }
 
+function pathPartCount(token) {
+  return String(token || '').split('/').filter(Boolean).length;
+}
+
+function matchLookupMinParts(token, fallback = 2) {
+  if (!useArcheryPathMatching()) return fallback;
+  return Math.min(5, Math.max(fallback, pathPartCount(token)));
+}
+
 function buildImageMatchIndexes() {
   imagePathSuffixMap = new Map();
   imageStemMap = new Map();
@@ -2634,13 +2663,13 @@ function buildImageMatchIndexes() {
 function buildAnnotationMatchIndex() {
   annotationPathSuffixMap = new Map();
   annotationMap.forEach((_, key) => {
-    const minParts = /[\\/]/.test(String(key || '')) ? 2 : 1;
+    const minParts = /[\\/]/.test(String(key || '')) ? matchLookupMinParts(normalizedPathToken(key), 2) : 1;
     pathSuffixes(key, minParts).forEach(suffix => {
       if (!annotationPathSuffixMap.has(suffix)) annotationPathSuffixMap.set(suffix, key);
     });
     if (useArcheryPathMatching()) {
       archeryPathAliasTokens(key).forEach(token => {
-        pathSuffixesFromToken(token, minParts).forEach(suffix => {
+        pathSuffixesFromToken(token, matchLookupMinParts(token, minParts)).forEach(suffix => {
           if (!annotationPathSuffixMap.has(suffix)) annotationPathSuffixMap.set(suffix, key);
         });
       });
@@ -2679,7 +2708,7 @@ function imagesForKey(key) {
   if (/[\\/]/.test(String(key || ''))) {
     const aliases = useArcheryPathMatching() ? archeryPathAliasTokens(key) : [normalizedPathToken(key)];
     for (const token of aliases) {
-      for (const suffix of pathSuffixesFromToken(token, 2)) {
+      for (const suffix of pathSuffixesFromToken(token, matchLookupMinParts(token, 2))) {
         const matches = imagePathSuffixMap.get(suffix) || [];
         if (matches.length) return matches;
       }
@@ -2694,7 +2723,7 @@ function annotationKeyForImageFile(file) {
   if (annotationMap.has(imageKey)) return imageKey;
   const aliases = useArcheryPathMatching() ? archeryPathAliasTokens(filePath(file)) : [normalizedPathToken(filePath(file))];
   for (const token of aliases) {
-    for (const suffix of pathSuffixesFromToken(token, 2)) {
+    for (const suffix of pathSuffixesFromToken(token, matchLookupMinParts(token, 2))) {
       const key = annotationPathSuffixMap.get(suffix);
       if (key) return key;
     }
