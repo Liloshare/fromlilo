@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build && node scripts/build-sites-server.js",
+    "build": "vite build",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name fromlilo --branch main",
     "visionqc:manifest": "node scripts/create-visionqc-manifest.js",
     "preview": "vite preview --host 0.0.0.0"
   },

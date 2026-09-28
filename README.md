@@ -6,7 +6,8 @@ fromlilo 사이트와 업무 자동화 툴을 함께 관리하는 단일 최신 
 
 - 로컬 경로: `/Users/lilo/fromlilo`
 - GitHub 원격: `https://github.com/Liloshare/fromlilo.git`
-- 배포 프로젝트: `.openai/hosting.json`
+- 운영 배포: Cloudflare Pages `fromlilo`
+- 운영 URL: `https://fromlilo.com`
 
 예전 `/Users/lilo/fromlilo.com` 저장소의 랜딩/서비스 문서는 이 저장소에 합쳐져 있습니다. 앞으로는 이 저장소만 수정합니다.
 
@@ -21,10 +22,16 @@ fromlilo 사이트와 업무 자동화 툴을 함께 관리하는 단일 최신 
 
 ## 실행
 
-브라우저에서 `index.html`을 직접 열거나, 로컬 서버로 확인합니다.
+로컬 개발 서버:
 
 ```bash
-python3 -m http.server 4173
+npm run dev
 ```
 
-그 다음 `http://localhost:4173`으로 접속합니다.
+운영 배포:
+
+```bash
+npm run deploy
+```
+
+`npm run deploy`는 `vite build` 후 Cloudflare Pages `fromlilo` 프로젝트에 `dist/`를 직접 배포합니다.
