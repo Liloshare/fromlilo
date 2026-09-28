@@ -4674,9 +4674,15 @@ function drawArcheryPoint(ctx, box, imgW, imgH, scaleX, scaleY, canvasW, key) {
   ctx.shadowBlur = 0;
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(0.8, canvasW / 3600), 0, Math.PI * 2);
+  ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(2, canvasW / 1300), 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
+
+function archeryTrackSortValue(key) {
+  const text = String(key).replace(/^[ta]:/, '');
+  const numeric = Number(text);
+  return Number.isFinite(numeric) ? numeric : text;
 }
 
 function drawArcheryTrackLabels(ctx, record, canvasW, imgW, imgH, scaleX, scaleY, classSet) {
@@ -4689,22 +4695,23 @@ function drawArcheryTrackLabels(ctx, record, canvasW, imgW, imgH, scaleX, scaleY
     const part = archeryPartForBox(box).toLowerCase();
     if (part === 'tip' || part === 'tail') groups.get(key)[part] = box;
   });
-  if (!groups.size) return;
+  const entries = Array.from(groups.entries()).filter(([, group]) => group.tail);
+  if (!entries.length) return;
+  entries.sort((a, b) => String(archeryTrackSortValue(a[0])).localeCompare(String(archeryTrackSortValue(b[0])), undefined, { numeric: true }));
+  const step = (Math.PI * 2) / entries.length;
   ctx.save();
-  groups.forEach((group, key) => {
-    if (!group.tail) return;
+  entries.forEach(([key, group], index) => {
     const scoreText = group.tip ? String(group.tip.labelScore || formatScore(group.tip.score) || '').trim() : '';
-    drawArcheryTailLabel(ctx, group.tail, key, scoreText, imgW, imgH, scaleX, scaleY, canvasW);
+    drawArcheryTailLabel(ctx, group.tail, key, scoreText, imgW, imgH, scaleX, scaleY, canvasW, index * step);
   });
   ctx.restore();
 }
 
-function drawArcheryTailLabel(ctx, tailBox, key, scoreText, imgW, imgH, scaleX, scaleY, canvasW) {
+function drawArcheryTailLabel(ctx, tailBox, key, scoreText, imgW, imgH, scaleX, scaleY, canvasW, angle) {
   const x = tailBox.xc * imgW * scaleX;
   const y = tailBox.yc * imgH * scaleY;
   const color = archeryTrackColor(key, 'Tail');
   const dist = Math.max(56, canvasW / 9);
-  const angle = (archeryHueForKey(key) / 360) * Math.PI * 2;
   const lx = x + Math.cos(angle) * dist;
   const ly = y + Math.sin(angle) * dist;
   ctx.strokeStyle = color;
