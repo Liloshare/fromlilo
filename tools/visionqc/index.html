@@ -2567,6 +2567,10 @@ function isArcheryMode() {
   return document.getElementById('classPresetSelect')?.value === 'archery';
 }
 
+function useArcheryPathMatching() {
+  return annotationFormat === 'arrowkp' || isArcheryMode();
+}
+
 function archeryBranchlessPathToken(value) {
   const parts = normalizedPathToken(value).split('/').filter(Boolean);
   const next = [];
@@ -2618,7 +2622,7 @@ function buildImageMatchIndexes() {
   imageStemMap = new Map();
   imageFiles.forEach(file => {
     pathSuffixes(filePath(file)).forEach(suffix => addMapList(imagePathSuffixMap, suffix, file));
-    if (isArcheryMode()) {
+    if (useArcheryPathMatching()) {
       archeryPathAliasTokens(filePath(file)).forEach(token => {
         pathSuffixesFromToken(token).forEach(suffix => addMapList(imagePathSuffixMap, suffix, file));
       });
@@ -2634,7 +2638,7 @@ function buildAnnotationMatchIndex() {
     pathSuffixes(key, minParts).forEach(suffix => {
       if (!annotationPathSuffixMap.has(suffix)) annotationPathSuffixMap.set(suffix, key);
     });
-    if (isArcheryMode()) {
+    if (useArcheryPathMatching()) {
       archeryPathAliasTokens(key).forEach(token => {
         pathSuffixesFromToken(token, minParts).forEach(suffix => {
           if (!annotationPathSuffixMap.has(suffix)) annotationPathSuffixMap.set(suffix, key);
@@ -2650,8 +2654,8 @@ function imageMatchesAnnotationKey(file, annotationKey) {
   const nameToken = compactMatchToken(file.name);
   if (!annotationToken || !nameToken) return false;
   if (/[\\/]/.test(String(annotationKey || ''))) {
-    const annotationAliases = isArcheryMode() ? archeryPathAliasTokens(annotationKey) : [normalizedPathToken(annotationKey)];
-    const imageAliases = isArcheryMode() ? archeryPathAliasTokens(filePath(file)) : [normalizedPathToken(filePath(file))];
+    const annotationAliases = useArcheryPathMatching() ? archeryPathAliasTokens(annotationKey) : [normalizedPathToken(annotationKey)];
+    const imageAliases = useArcheryPathMatching() ? archeryPathAliasTokens(filePath(file)) : [normalizedPathToken(filePath(file))];
     return annotationAliases.some(annotationPath => (
       imageAliases.some(imagePath => imagePath === annotationPath || imagePath.endsWith(`/${annotationPath}`) || annotationPath.endsWith(`/${imagePath}`))
     ));
@@ -2673,7 +2677,7 @@ function imagesForKey(key) {
     return candidates;
   }
   if (/[\\/]/.test(String(key || ''))) {
-    const aliases = isArcheryMode() ? archeryPathAliasTokens(key) : [normalizedPathToken(key)];
+    const aliases = useArcheryPathMatching() ? archeryPathAliasTokens(key) : [normalizedPathToken(key)];
     for (const token of aliases) {
       for (const suffix of pathSuffixesFromToken(token, 2)) {
         const matches = imagePathSuffixMap.get(suffix) || [];
@@ -2688,7 +2692,7 @@ function imagesForKey(key) {
 function annotationKeyForImageFile(file) {
   const imageKey = normalizedFilePathStem(file);
   if (annotationMap.has(imageKey)) return imageKey;
-  const aliases = isArcheryMode() ? archeryPathAliasTokens(filePath(file)) : [normalizedPathToken(filePath(file))];
+  const aliases = useArcheryPathMatching() ? archeryPathAliasTokens(filePath(file)) : [normalizedPathToken(filePath(file))];
   for (const token of aliases) {
     for (const suffix of pathSuffixesFromToken(token, 2)) {
       const key = annotationPathSuffixMap.get(suffix);
