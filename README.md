@@ -28,10 +28,18 @@ fromlilo 사이트와 업무 자동화 툴을 함께 관리하는 단일 최신 
 npm run dev
 ```
 
-운영 배포:
+운영 반영:
+
+```bash
+git push origin main
+```
+
+Cloudflare Pages `fromlilo` 프로젝트가 `main` 브랜치 push를 감지해 자동으로 `npm run build`를 실행하고 `dist/`를 배포합니다.
+
+수동 재배포가 필요할 때:
 
 ```bash
 npm run deploy
 ```
 
-`npm run deploy`는 `vite build` 후 Cloudflare Pages `fromlilo` 프로젝트에 `dist/`를 직접 배포합니다.
+`npm run deploy`는 자동 배포가 지연되거나 Cloudflare 캐시 확인이 필요할 때만 쓰는 백업 경로입니다.
