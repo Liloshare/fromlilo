@@ -1983,7 +1983,7 @@
 
         <div class="viewer-side">
           <div class="meta-table" id="metaTable">
-            <div class="meta-row"><div class="meta-key">FILE</div><div class="meta-val">EMPTY</div></div>
+            <div class="meta-row"><div class="meta-key">OUTPUT</div><div class="meta-val">EMPTY</div></div>
           </div>
 
           <details class="box-details" id="boxDetails">
@@ -3086,6 +3086,7 @@ async function buildArrowKeypointAnnotationMap(files) {
             shape.score = readKeypointScore(ann, point);
             shape.arrowId = parsed.arrowId;
             shape.part = parsed.part;
+            shape.labelScore = parsed.part === 'Tip' ? parsed.scoreSuffix : '';
             shape.pointIndex = pointIdx + 1;
             boxes.push(shape);
             classNames.push(className);
@@ -3105,12 +3106,13 @@ async function buildArrowKeypointAnnotationMap(files) {
 
 function parseArrowKeypointLabel(label) {
   const text = String(label || '');
-  const match = text.match(/^Arrow_(\d+)(?:_invi)?_(Tip|Body|Tail)(?:_.+)?$/i);
+  const match = text.match(/^Arrow_(\d+)(?:_invi)?_(Tip|Body|Tail)(?:_(.+))?$/i);
   const part = match ? match[2].charAt(0).toUpperCase() + match[2].slice(1).toLowerCase() : '';
   return {
     arrowId: match ? match[1] : '',
     part,
-    invisible: /_invi_/i.test(text)
+    invisible: /_invi_/i.test(text),
+    scoreSuffix: match ? (match[3] || '') : ''
   };
 }
 
@@ -4405,7 +4407,7 @@ async function renderCurrent() {
     canvas.width = 1; canvas.height = 1;
     boxList.innerHTML = '';
     if (boxSummary) boxSummary.textContent = '';
-    document.getElementById('metaTable').innerHTML = '<div class="meta-row"><div class="meta-key">FILE</div><div class="meta-val">EMPTY</div></div>';
+    document.getElementById('metaTable').innerHTML = '<div class="meta-row"><div class="meta-key">OUTPUT</div><div class="meta-val">EMPTY</div></div>';
     renderFeedbackDrawer();
     return;
   }
@@ -4565,6 +4567,29 @@ function updateReviewToolMode() {
   if (isSelect) document.getElementById('magnifier')?.classList.add('hidden');
 }
 
+function archeryGroupKeyForBox(box) {
+  if (box.trackId !== '' && box.trackId !== null && box.trackId !== undefined) return `t:${box.trackId}`;
+  if (box.arrowId !== '' && box.arrowId !== null && box.arrowId !== undefined) return `a:${box.arrowId}`;
+  return null;
+}
+
+function archeryPartForBox(box) {
+  return String(box.className || '').replace(/^invi_/i, '');
+}
+
+function archeryHueForKey(key) {
+  const text = String(key);
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+  return hash % 360;
+}
+
+function archeryTrackColor(key, part) {
+  const hue = archeryHueForKey(key);
+  const lightness = part === 'Tip' ? 70 : part === 'Body' ? 52 : 34;
+  return `hsl(${hue}, 75%, ${lightness}%)`;
+}
+
 function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet = visibleClasses) {
   ctx.save();
   const scaleX = canvasW / imgW;
@@ -4574,7 +4599,8 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
   record.boxes.forEach((box, idx) => {
     if (!classSet.has(box.className)) return;
     legendClasses.add(box.className);
-    const color = classColors[box.className] || '#a8a4bd';
+    const archeryKey = box.type === 'keypoint' ? archeryGroupKeyForBox(box) : null;
+    const color = archeryKey ? archeryTrackColor(archeryKey, archeryPartForBox(box)) : (classColors[box.className] || '#a8a4bd');
     const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
     const isFilteredClass = classFilter !== '__all__' && box.className === classFilter;
     const isDimmedByFilter = classFilter !== '__all__' && box.className !== classFilter;
@@ -4584,7 +4610,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     if (box.type === 'polygon') ctx.fill();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(1.2, canvasW / 2100), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, archeryKey ? Math.max(0.9, canvasW / 3000) : Math.max(1.2, canvasW / 2100), 0, Math.PI * 2);
       ctx.fill();
     }
     else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
@@ -4600,7 +4626,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     if (box.type === 'polygon') ctx.stroke();
     else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(2, canvasW / 1800), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, archeryKey ? Math.max(1.4, canvasW / 2600) : Math.max(2, canvasW / 1800), 0, Math.PI * 2);
       ctx.stroke();
     }
     else ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
@@ -4613,14 +4639,14 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
       ctx.stroke();
     } else if (box.type === 'keypoint') {
       ctx.beginPath();
-      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, Math.max(2.4, canvasW / 1500), 0, Math.PI * 2);
+      ctx.arc(box.xc * imgW * scaleX, box.yc * imgH * scaleY, archeryKey ? Math.max(1.7, canvasW / 2200) : Math.max(2.4, canvasW / 1500), 0, Math.PI * 2);
       ctx.stroke();
     } else {
       ctx.strokeRect(rect.x - 1, rect.y - 1, rect.w + 2, rect.h + 2);
     }
     ctx.globalAlpha = 1;
     ctx.shadowBlur = 0;
-    if (isMain && !labelAnchors.has(box.className)) {
+    if (isMain && !archeryKey && !labelAnchors.has(box.className)) {
       labelAnchors.set(box.className, {
         x: Math.max(2, Math.min(canvasW - 10, rect.x || box.xc * imgW * scaleX)),
         y: Math.max(14, Math.min(canvasH - 4, (rect.y || box.yc * imgH * scaleY) - 4)),
@@ -4629,8 +4655,70 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     }
   });
   if (isMain) drawClassNameTags(ctx, labelAnchors, canvasW);
+  if (isMain) drawArcheryTrackLabels(ctx, record, canvasW, imgW, imgH, scaleX, scaleY, classSet);
   if (isMain) drawOverlayLegend(ctx, record, Array.from(legendClasses), canvasW);
   ctx.restore();
+}
+
+function drawArcheryTrackLabels(ctx, record, canvasW, imgW, imgH, scaleX, scaleY, classSet) {
+  const groups = new Map();
+  record.boxes.forEach(box => {
+    if (box.type !== 'keypoint' || !classSet.has(box.className)) return;
+    const key = archeryGroupKeyForBox(box);
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, { tip: null, tail: null });
+    const part = archeryPartForBox(box).toLowerCase();
+    if (part === 'tip' || part === 'tail') groups.get(key)[part] = box;
+  });
+  if (!groups.size) return;
+  ctx.save();
+  groups.forEach((group, key) => {
+    if (group.tail) drawArcheryTailLabel(ctx, group.tail, key, imgW, imgH, scaleX, scaleY, canvasW);
+    if (group.tip) drawArcheryTipScore(ctx, group.tip, imgW, imgH, scaleX, scaleY, canvasW);
+  });
+  ctx.restore();
+}
+
+function drawArcheryTailLabel(ctx, tailBox, key, imgW, imgH, scaleX, scaleY, canvasW) {
+  const x = tailBox.xc * imgW * scaleX;
+  const y = tailBox.yc * imgH * scaleY;
+  const color = archeryTrackColor(key, 'Tail');
+  const dist = Math.max(18, canvasW / 55);
+  const lx = x + dist;
+  const ly = y + dist * 0.55;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, canvasW / 900);
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(lx, ly);
+  ctx.stroke();
+  const label = key.slice(2);
+  const fontSize = Math.max(9, Math.round(canvasW / 150));
+  ctx.font = `700 ${fontSize}px "Courier New", monospace`;
+  const padX = 5;
+  const w = ctx.measureText(label).width + padX * 2;
+  const h = fontSize + 6;
+  ctx.fillStyle = color;
+  ctx.fillRect(lx, ly - h / 2, w, h);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, lx + padX, ly - h / 2 + h - 6);
+}
+
+function drawArcheryTipScore(ctx, tipBox, imgW, imgH, scaleX, scaleY, canvasW) {
+  const scoreText = String(tipBox.labelScore || formatScore(tipBox.score) || '').trim();
+  if (!scoreText) return;
+  const x = tipBox.xc * imgW * scaleX;
+  const y = tipBox.yc * imgH * scaleY;
+  const fontSize = Math.max(10, Math.round(canvasW / 130));
+  ctx.font = `700 ${fontSize}px "Courier New", monospace`;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0,0,0,.85)';
+  ctx.fillStyle = '#ffffff';
+  const tx = x + Math.max(6, canvasW / 260);
+  const ty = y - Math.max(4, canvasW / 400);
+  ctx.strokeText(scoreText, tx, ty);
+  ctx.fillText(scoreText, tx, ty);
 }
 
 function drawClassNameTags(ctx, anchors, canvasW) {
@@ -5293,10 +5381,10 @@ function renderMeta(record) {
   const displayPath = recordDisplayPath(record);
   const rows = [
     ['NO', record.order ? `${record.order} / ${reviewableTotal}` : '-'],
-    ['PATH', displayPath],
-    ['FILE', record.baseName],
+    ['IMAGE', displayPath],
+    ['OUTPUT', recordOutputPath(record)],
     ['SIZE', record.imageSize ? `${record.imageSize.width} x ${record.imageSize.height}` : '-']
-  ].map(([k, v]) => `<div class="meta-row"><div class="meta-key">${k}</div><div class="meta-val">${escapeHtml(v)}</div>${k === 'FILE' || k === 'PATH' ? `<button class="meta-copy" type="button" data-copy="${escapeHtml(v)}">COPY</button>` : '<span></span>'}</div>`).join('');
+  ].map(([k, v]) => `<div class="meta-row"><div class="meta-key">${k}</div><div class="meta-val">${escapeHtml(v)}</div>${k === 'OUTPUT' || k === 'IMAGE' ? `<button class="meta-copy" type="button" data-copy="${escapeHtml(v)}">COPY</button>` : '<span></span>'}</div>`).join('');
 
   let dupRow = '';
   if (isDuplicate(record)) {
@@ -5318,6 +5406,12 @@ function recordDisplayPath(record) {
   const sourcePath = record.imageFile ? filePath(record.imageFile) : record.labelFile ? filePath(record.labelFile) : '';
   const annotationPath = record.annotationKey || (record.id && /[\\/]/.test(record.id) ? record.id : '');
   return sourcePath && sourcePath !== record.imageFile?.name ? sourcePath : annotationPath || sourcePath || record.baseName;
+}
+
+function recordOutputPath(record) {
+  const labelPath = record.labelFile ? filePath(record.labelFile) : '';
+  const annotationPath = record.annotationKey || (record.id && /[\\/]/.test(record.id) ? record.id : '');
+  return labelPath && labelPath !== record.labelFile?.name ? labelPath : annotationPath || labelPath || record.baseName;
 }
 
 function recordFolderPath(record, depth = 4) {
@@ -6430,11 +6524,20 @@ function sortedFeedbackDocPages() {
   });
 }
 
+function displayOrderedFeedbackDocPages() {
+  const sorted = sortedFeedbackDocPages();
+  const activeIdx = sorted.findIndex(entry => entry.index === feedbackDocActive);
+  if (activeIdx <= 0) return sorted;
+  const [active] = sorted.splice(activeIdx, 1);
+  sorted.unshift(active);
+  return sorted;
+}
+
 function renderFeedbackDrawer() {
   setFeedbackMiniTool(feedbackMiniTool);
   const wrap = document.getElementById('feedbackMiniPages');
   if (!wrap) return;
-  const rows = sortedFeedbackDocPages();
+  const rows = displayOrderedFeedbackDocPages();
   wrap.innerHTML = rows.length ? rows.map(({ page, index }) => `
     <div class="feedback-mini-page ${index === feedbackDocActive ? 'active' : ''}" data-doc-index="${index}">
       <canvas class="feedback-mini-canvas" data-doc-canvas="${index}"></canvas>
@@ -6490,7 +6593,7 @@ async function redrawFeedbackDocCanvas(canvas) {
   canvas.width = 960;
   canvas.height = 540;
   const ctx = canvas.getContext('2d');
-  await drawFeedbackDocImage(ctx, record, page, canvas.width, canvas.height, true);
+  canvas._imgRect = await drawFeedbackDocImage(ctx, record, page, canvas.width, canvas.height, true);
 }
 
 async function drawFeedbackDocImage(ctx, record, page, canvasW, canvasH, withHandles = false) {
@@ -6510,7 +6613,7 @@ async function drawFeedbackDocImage(ctx, record, page, canvasW, canvasH, withHan
   ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
   drawFeedbackDocOriginalLabels(ctx, record, crop, dx, dy, dw, dh);
   (page.shapes || []).forEach(shape => drawFeedbackShape(ctx, shape, canvasW, canvasH, false, withHandles));
-  if (!withHandles) return;
+  return { dx, dy, dw, dh };
 }
 
 function drawFeedbackDocOriginalLabels(ctx, record, crop, dx, dy, dw, dh) {
@@ -6566,6 +6669,11 @@ function attachFeedbackDocCanvasEvents(canvas) {
       }
       return;
     }
+    if (feedbackMiniTool === 'select') {
+      feedbackMiniDraft = { canvas, pageIndex, tool: 'select', shape: { type: 'rect', color: '#2563eb', x1: point.x, y1: point.y, x2: point.x, y2: point.y } };
+      canvas.setPointerCapture(event.pointerId);
+      return;
+    }
     if (feedbackMiniTool !== 'arrow') return;
     feedbackMiniDraft = { canvas, pageIndex, shape: { type: 'arrow', color: '#ff2d55', x1: point.x, y1: point.y, x2: point.x, y2: point.y } };
     canvas.setPointerCapture(event.pointerId);
@@ -6581,11 +6689,36 @@ function attachFeedbackDocCanvasEvents(canvas) {
     if (!feedbackMiniDraft || feedbackMiniDraft.canvas !== canvas) return;
     const page = feedbackDocPages[feedbackMiniDraft.pageIndex];
     const shape = feedbackMiniDraft.shape;
+    const isSelect = feedbackMiniDraft.tool === 'select';
     feedbackMiniDraft = null;
-    if (page && (Math.abs(shape.x2 - shape.x1) > 0.01 || Math.abs(shape.y2 - shape.y1) > 0.01)) page.shapes.push(shape);
     canvas.releasePointerCapture(event.pointerId);
+    const hasSize = Math.abs(shape.x2 - shape.x1) > 0.01 || Math.abs(shape.y2 - shape.y1) > 0.01;
+    if (page && hasSize) {
+      if (isSelect) applyFeedbackDocCropSelection(canvas, page, shape);
+      else page.shapes.push(shape);
+    }
     redrawFeedbackDocCanvas(canvas);
   });
+}
+
+function applyFeedbackDocCropSelection(canvas, page, shape) {
+  const rect = canvas._imgRect;
+  if (!rect || !rect.dw || !rect.dh) return;
+  const prevCrop = page.crop || { x: 0, y: 0, w: 1, h: 1 };
+  const px1 = shape.x1 * canvas.width;
+  const py1 = shape.y1 * canvas.height;
+  const px2 = shape.x2 * canvas.width;
+  const py2 = shape.y2 * canvas.height;
+  const toImgX = px => prevCrop.x + Math.max(0, Math.min(1, (px - rect.dx) / rect.dw)) * prevCrop.w;
+  const toImgY = py => prevCrop.y + Math.max(0, Math.min(1, (py - rect.dy) / rect.dh)) * prevCrop.h;
+  const x1 = toImgX(Math.min(px1, px2));
+  const x2 = toImgX(Math.max(px1, px2));
+  const y1 = toImgY(Math.min(py1, py2));
+  const y2 = toImgY(Math.max(py1, py2));
+  const w = x2 - x1;
+  const h = y2 - y1;
+  if (w < 0.005 || h < 0.005) return;
+  page.crop = { x: x1, y: y1, w, h };
 }
 
 function setFeedbackTool(tool) {
