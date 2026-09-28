@@ -2228,6 +2228,7 @@ let imagePathSuffixMap = new Map();
 let imageStemMap = new Map();
 let annotationPathSuffixMap = new Map();
 let classes = [];
+let archeryTrackAngleCache = null;
 let classColors = {};
 let classLineWidths = {};
 let visibleClasses = new Set();
@@ -2881,6 +2882,7 @@ function applyClassEditor() {
 
 function clearLoadedReviewState() {
   records = [];
+  archeryTrackAngleCache = null;
   issueMap.clear();
   reviewedSet.clear();
   viewedSet.clear();
@@ -3431,6 +3433,7 @@ async function runValidation() {
   if (!classes.length) await buildClassesFromLabelFiles();
   readClassInput();
   records = [];
+  archeryTrackAngleCache = null;
   issueMap.clear();
   reviewedSet.clear();
   viewedSet.clear();
@@ -4685,6 +4688,25 @@ function archeryTrackSortValue(key) {
   return Number.isFinite(numeric) ? numeric : text;
 }
 
+function buildArcheryTrackAngleCache() {
+  const keys = new Set();
+  records.forEach(rec => {
+    (rec.boxes || []).forEach(box => {
+      if (box.type !== 'keypoint') return;
+      const key = archeryGroupKeyForBox(box);
+      if (key) keys.add(key);
+    });
+  });
+  const sorted = Array.from(keys).sort((a, b) => String(archeryTrackSortValue(a)).localeCompare(String(archeryTrackSortValue(b)), undefined, { numeric: true }));
+  const step = sorted.length ? (Math.PI * 2) / sorted.length : 0;
+  archeryTrackAngleCache = new Map(sorted.map((key, index) => [key, index * step]));
+}
+
+function archeryTrackAngle(key) {
+  if (!archeryTrackAngleCache) buildArcheryTrackAngleCache();
+  return archeryTrackAngleCache.get(key) ?? 0;
+}
+
 function drawArcheryTrackLabels(ctx, record, canvasW, imgW, imgH, scaleX, scaleY, classSet) {
   const groups = new Map();
   record.boxes.forEach(box => {
@@ -4695,14 +4717,12 @@ function drawArcheryTrackLabels(ctx, record, canvasW, imgW, imgH, scaleX, scaleY
     const part = archeryPartForBox(box).toLowerCase();
     if (part === 'tip' || part === 'tail') groups.get(key)[part] = box;
   });
-  const entries = Array.from(groups.entries()).filter(([, group]) => group.tail);
-  if (!entries.length) return;
-  entries.sort((a, b) => String(archeryTrackSortValue(a[0])).localeCompare(String(archeryTrackSortValue(b[0])), undefined, { numeric: true }));
-  const step = (Math.PI * 2) / entries.length;
+  if (!groups.size) return;
   ctx.save();
-  entries.forEach(([key, group], index) => {
+  groups.forEach((group, key) => {
+    if (!group.tail) return;
     const scoreText = group.tip ? String(group.tip.labelScore || formatScore(group.tip.score) || '').trim() : '';
-    drawArcheryTailLabel(ctx, group.tail, key, scoreText, imgW, imgH, scaleX, scaleY, canvasW, index * step);
+    drawArcheryTailLabel(ctx, group.tail, key, scoreText, imgW, imgH, scaleX, scaleY, canvasW, archeryTrackAngle(key));
   });
   ctx.restore();
 }
@@ -7268,6 +7288,7 @@ function resetAll() {
   annotationFormat = 'yolo';
   annotationMap = new Map();
   records = [];
+  archeryTrackAngleCache = null;
   currentIndex = -1;
   activeBoxIndex = -1;
   issueTarget = null;
