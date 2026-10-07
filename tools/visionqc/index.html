@@ -1900,7 +1900,7 @@
 
     <section class="panel gallery-panel">
       <div class="toolbar">
-        <input id="searchInput" type="text" placeholder="SEARCH FILE NAME">
+        <input id="searchInput" type="text" placeholder="SEARCH FILE / FOLDER / PATH">
         <button class="file-filter-btn" id="excelFilterBtn" type="button">XLSX</button>
         <input id="excelFilterInput" type="file" accept=".xlsx,.csv,text/csv">
         <select id="sampleModeSelect" aria-label="SAMPLE MODE">
@@ -2744,10 +2744,46 @@ function setAnnotationClasses(names) {
 function recordMatchesExcelFilter(record) {
   if (!excelFilterNames.size) return true;
   const tokens = Array.from(excelFilterNames);
-  return [record.baseName, record.imageFile?.name, record.labelFile?.name]
+  return recordSearchParts(record)
     .filter(Boolean)
     .map(normalizedFileToken)
     .some(name => tokens.some(token => name.includes(token) || token.includes(name)));
+}
+
+function pathFolderTokens(path) {
+  const parts = String(path || '').replace(/\\/g, '/').split('/').filter(Boolean);
+  if (parts.length <= 1) return parts;
+  return [
+    ...parts,
+    parts.slice(0, -1).join('/'),
+    parts.slice(-2, -1)[0] || '',
+    parts.slice(-3, -1).join('/')
+  ].filter(Boolean);
+}
+
+function recordSearchParts(record) {
+  const imagePath = record?.imageFile ? filePath(record.imageFile) : '';
+  const outputPath = record ? recordOutputPath(record) : '';
+  const displayPath = record ? recordDisplayPath(record) : '';
+  return [
+    record?.baseName || '',
+    record?.imageFile?.name || '',
+    record?.labelFile?.name || '',
+    record?.annotationKey || '',
+    imagePath,
+    outputPath,
+    displayPath,
+    record ? recordFolderPath(record, 8) : '',
+    ...pathFolderTokens(imagePath),
+    ...pathFolderTokens(outputPath),
+    ...pathFolderTokens(displayPath)
+  ];
+}
+
+function recordMatchesSearch(record, query) {
+  const q = String(query || '').trim().normalize('NFC').toLowerCase();
+  if (!q) return true;
+  return recordSearchParts(record).join(' ').normalize('NFC').toLowerCase().includes(q);
 }
 
 function recordMatchesSample(record) {
@@ -3906,12 +3942,7 @@ function filteredRecords() {
       if (f === 'done' && !isReviewed(r)) return false;
       if (f === 'remain' && !isRemainRecord(r)) return false;
     }
-    const imagePath = r.imageFile ? filePath(r.imageFile) : '';
-    const haystack = [r.baseName, r.imageFile?.name || '', r.labelFile?.name || '', imagePath.split(/[\\/]/).pop() || '']
-      .join(' ')
-      .normalize('NFC')
-      .toLowerCase();
-    if (q && !haystack.includes(q)) return false;
+    if (!recordMatchesSearch(r, q)) return false;
     if (f !== 'unmatch' && classFilter !== '__all__' && !r.boxes.some(b => b.className === classFilter)) return false;
     return true;
   });
@@ -3947,8 +3978,7 @@ function duplicateVariantRows() {
   const rows = [];
   scopedRecords().forEach(r => {
     if (r.status !== 'matched' || !isDuplicate(r)) return;
-    const haystack = [r.baseName, r.imageFile?.name || '', r.labelFile?.name || ''].join(' ').normalize('NFC').toLowerCase();
-    if (q && !haystack.includes(q)) return;
+    if (!recordMatchesSearch(r, q)) return;
     if (!r.labelVariants?.length) {
       rows.push(r);
       return;
