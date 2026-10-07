@@ -610,6 +610,20 @@
     }
     #overlayModeBtn.active,
     #imageModeBtn.active { background: #e1e6fa; color: #5570c9; }
+    .mask-only-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 30px;
+      padding: 0 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+      user-select: none;
+    }
+    .mask-only-toggle input { margin: 0; }
     #mainCanvas.select-mode { cursor: pointer; }
     .tool-switch {
       display: inline-flex;
@@ -1962,6 +1976,10 @@
             <button id="overlayModeBtn" onclick="setMainViewMode('overlay')" title="OVERLAY ON">ON</button>
             <button id="imageModeBtn" onclick="setMainViewMode('image')" title="OVERLAY OFF">OFF</button>
           </div>
+          <label class="mask-only-toggle" title="MASK ONLY WHEN OVERLAY IS ON">
+            <input id="maskOnlyInput" type="checkbox" onchange="setMaskOnlyMode(this.checked)">
+            MASK
+          </label>
           <button id="fullscreenToggleBtn" onclick="toggleReviewMode()" title="FOCUS">FOCUS</button>
         </div>
       </div>
@@ -2235,6 +2253,7 @@ let visibleClasses = new Set();
 let classFilter = '__all__'; // '__all__' or a single class name — which images the gallery shows
 let reviewableTotal = 0; // count of matched+has-boxes records, for the stable #order badge
 let mainViewMode = 'overlay'; // 'overlay' | 'image' — single-image review canvas only
+let maskOnlyMode = false;
 let reviewToolMode = 'select'; // 'magnifier' | 'select'
 let magnifierImg = null; // full-res <img> for the currently selected record, used by the lens
 let records = [];
@@ -4422,6 +4441,8 @@ document.addEventListener('keydown', (e) => {
   const key = e.key.toLowerCase();
   if (isTyping) return;
   if ((key === 'h' || e.code === 'KeyH') && !e.repeat) { e.preventDefault(); toggleMainViewMode(); return; }
+  if ((key === 'b' || e.code === 'KeyB') && !e.repeat) { e.preventDefault(); setReviewToolMode('magnifier'); return; }
+  if ((key === 'v' || e.code === 'KeyV') && !e.repeat) { e.preventDefault(); setReviewToolMode('select'); return; }
   if (/^[1-8]$/.test(key)) {
     e.preventDefault();
     handleIssueShortcut(Number(key));
@@ -4561,7 +4582,13 @@ async function renderCanvas(canvas, record, maxWidth, isMain = false, maxHeight 
   canvas.width = w;
   canvas.height = h;
 
-  ctx.drawImage(img, 0, 0, w, h);
+  const isMaskOnly = isMain && mainViewMode === 'overlay' && maskOnlyMode;
+  if (isMaskOnly) {
+    ctx.fillStyle = '#05070d';
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.drawImage(img, 0, 0, w, h);
+  }
   if (!isMain || mainViewMode === 'overlay') {
     drawBoxes(ctx, record, w, h, img.naturalWidth, img.naturalHeight, isMain);
   }
@@ -4581,9 +4608,20 @@ function setMainViewMode(mode) {
   renderCurrent();
 }
 
+function setMaskOnlyMode(value) {
+  maskOnlyMode = Boolean(value);
+  updateMainViewToggleBtn();
+  renderCurrent();
+}
+
 function updateMainViewToggleBtn() {
   document.getElementById('overlayModeBtn')?.classList.toggle('active', mainViewMode === 'overlay');
   document.getElementById('imageModeBtn')?.classList.toggle('active', mainViewMode === 'image');
+  const input = document.getElementById('maskOnlyInput');
+  if (input) {
+    input.checked = maskOnlyMode;
+    input.disabled = mainViewMode !== 'overlay';
+  }
 }
 updateMainViewToggleBtn();
 
@@ -5085,7 +5123,12 @@ function drawMagnifier(clientX, clientY) {
   lensCanvas.height = MAGNIFIER_SIZE;
   const ctx = lensCanvas.getContext('2d');
   ctx.clearRect(0, 0, MAGNIFIER_SIZE, MAGNIFIER_SIZE);
-  ctx.drawImage(magnifierImg, sx, sy, cropW, cropH, 0, 0, MAGNIFIER_SIZE, MAGNIFIER_SIZE);
+  if (mainViewMode === 'overlay' && maskOnlyMode) {
+    ctx.fillStyle = '#05070d';
+    ctx.fillRect(0, 0, MAGNIFIER_SIZE, MAGNIFIER_SIZE);
+  } else {
+    ctx.drawImage(magnifierImg, sx, sy, cropW, cropH, 0, 0, MAGNIFIER_SIZE, MAGNIFIER_SIZE);
+  }
   if (mainViewMode === 'overlay') {
     drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH);
   }
@@ -7333,6 +7376,7 @@ function resetAll() {
   classFilter = '__all__';
   reviewableTotal = 0;
   mainViewMode = 'overlay';
+  maskOnlyMode = false;
   magnifierImg = null;
   updateMainViewToggleBtn();
   objectUrlCache.forEach(url => URL.revokeObjectURL(url));
