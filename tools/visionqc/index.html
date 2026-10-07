@@ -4644,7 +4644,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
     const isFilteredClass = classFilter !== '__all__' && box.className === classFilter;
     const isDimmedByFilter = classFilter !== '__all__' && box.className !== classFilter;
-    ctx.globalAlpha = isDimmedByFilter ? 0.035 : (isMain ? 0.08 : 0.14);
+    ctx.globalAlpha = isDimmedByFilter ? 0.035 : (box.type === 'polygon' ? 0.2 : (isMain ? 0.08 : 0.14));
     ctx.fillStyle = color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.fill();
@@ -5388,7 +5388,13 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     ctx.lineWidth = isActive ? Math.min(5, baseLineWidth + 1) : baseLineWidth;
     ctx.strokeStyle = isActive ? '#ffffff' : color;
     drawLensShape(ctx, box, sx, sy, imgW, imgH, scaleX, scaleY);
-    if (box.type === 'polygon') ctx.stroke();
+    if (box.type === 'polygon') {
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.stroke();
+    }
     else if (box.type === 'keypoint') {
       ctx.beginPath();
       ctx.arc((box.xc * imgW - sx) * scaleX, (box.yc * imgH - sy) * scaleY, 2.4, 0, Math.PI * 2);
@@ -6730,6 +6736,9 @@ function drawFeedbackDocOriginalLabels(ctx, record, crop, dx, dy, dw, dh) {
         else ctx.lineTo(x, y);
       });
       ctx.closePath();
+      ctx.globalAlpha = 0.2;
+      ctx.fill();
+      ctx.globalAlpha = 1;
       ctx.stroke();
     } else if (box.type === 'keypoint') {
       const x = dx + ((box.xc - crop.x) / crop.w) * dw;
