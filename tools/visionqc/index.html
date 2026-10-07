@@ -2949,7 +2949,7 @@ function clearLoadedReviewState() {
 
 function handleImages(files) {
   clearLoadedReviewState();
-  const rawImages = Array.from(files).filter(f => /\.(jpg|jpeg|png)$/i.test(f.name));
+  const rawImages = Array.from(files).filter(f => !isSystemMetadataFile(f) && /\.(jpg|jpeg|png)$/i.test(f.name));
   const all = uniqueImageFiles(rawImages);
   // If the picked folder contains an "output" subfolder (the finalized image
   // set), only match against those instead of every image under the whole
@@ -2961,6 +2961,13 @@ function handleImages(files) {
   const dedupeText = rawImages.length !== all.length ? ` / DEDUP ${rawImages.length}` : '';
   imageDrop.querySelector('span').textContent = outputOnly.length ? `OUTPUT / ${all.length}${dedupeText}` : `LOADED${dedupeText}`;
   checkReady();
+}
+
+function isSystemMetadataFile(file) {
+  const path = filePath(file).replace(/\\/g, '/');
+  const parts = path.split('/').filter(Boolean);
+  const name = parts[parts.length - 1] || file.name || '';
+  return name.startsWith('._') || name === '.DS_Store' || parts.includes('__MACOSX');
 }
 
 function uniqueImageFiles(files) {
@@ -2976,7 +2983,7 @@ function uniqueImageFiles(files) {
 
 async function handleLabels(files) {
   clearLoadedReviewState();
-  const all = Array.from(files);
+  const all = Array.from(files).filter(file => !isSystemMetadataFile(file));
   const jsonFiles = all.filter(f => /\.json$/i.test(f.name));
   annotationMap = new Map();
   if (jsonFiles.length) {
