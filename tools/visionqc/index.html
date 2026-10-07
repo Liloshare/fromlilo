@@ -3204,14 +3204,17 @@ function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
     unsupported.push(`COCO row ${row} unsupported segmentation`);
   }
   const rawSegmentation = Array.isArray(ann.segmentation) ? ann.segmentation : [];
-  const segmentations = rawSegmentation.length && typeof rawSegmentation[0] === 'number' ? [rawSegmentation] : rawSegmentation;
+  const segmentations = normalizeCocoSegmentations(rawSegmentation);
   segmentations.forEach((points, segIdx) => {
-    if (!Array.isArray(points) || points.length < 6) {
+    if (!points.length) {
       unsupported.push(`COCO row ${row} invalid polygon ${segIdx + 1}`);
       return;
     }
-    shapes.push(makePolygonShape(className, pointsToPairs(points), row, imgW, imgH));
+    const shape = makePolygonShape(className, points, row, imgW, imgH);
+    if (shape) shapes.push(shape);
+    else unsupported.push(`COCO row ${row} invalid polygon ${segIdx + 1}`);
   });
+  if (hasSegmentationValue && !segmentations.length && Array.isArray(ann.segmentation)) unsupported.push(`COCO row ${row} unsupported segmentation`);
   if (Array.isArray(ann.keypoints) && ann.keypoints.length) unsupported.push(`COCO row ${row} unsupported keypoints`);
   if (Array.isArray(ann.bbox) && ann.bbox.length >= 4) {
     const [x, y, w, h] = ann.bbox.map(Number);
@@ -3230,6 +3233,15 @@ function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
   }
   shapes.unsupported = unsupported;
   return shapes;
+}
+
+function normalizeCocoSegmentations(segmentation) {
+  if (!Array.isArray(segmentation) || !segmentation.length) return [];
+  if (typeof segmentation[0] === 'number') return [pointsToPairs(segmentation)].filter(points => points.length >= 3);
+  if (Array.isArray(segmentation[0]) && segmentation[0].length === 2 && typeof segmentation[0][0] === 'number') {
+    return [segmentation].filter(points => points.length >= 3);
+  }
+  return segmentation.flatMap(item => normalizeCocoSegmentations(item));
 }
 
 async function buildLabelMeAnnotationMap(files) {
@@ -3277,6 +3289,7 @@ function pointsToPairs(points) {
 
 function makePolygonShape(className, points, row, imgW, imgH) {
   const clean = points.map(([x, y]) => [Number(x), Number(y)]).filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y));
+  if (clean.length < 3) return null;
   const xs = clean.map(p => p[0]);
   const ys = clean.map(p => p[1]);
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
