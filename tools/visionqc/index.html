@@ -1922,7 +1922,12 @@
           <option value="5">RANDOM 5%</option>
           <option value="10">RANDOM 10%</option>
         </select>
-        <div class="toolbar-status" id="toolbarStatus"></div>
+        <div class="toolbar-status" id="toolbarStatus">
+          <label class="mask-only-toggle" title="GALLERY MASK ONLY">
+            <input id="galleryMaskOnlyInput" type="checkbox" onchange="setGalleryMaskOnlyMode(this.checked)">
+            MASK
+          </label>
+        </div>
       </div>
       <div class="class-chip-row" id="classChipRow"></div>
       <div class="pager gallery-pager">
@@ -2254,6 +2259,7 @@ let classFilter = '__all__'; // '__all__' or a single class name — which image
 let reviewableTotal = 0; // count of matched+has-boxes records, for the stable #order badge
 let mainViewMode = 'overlay'; // 'overlay' | 'image' — single-image review canvas only
 let maskOnlyMode = false;
+let galleryMaskOnlyMode = false;
 let reviewToolMode = 'select'; // 'magnifier' | 'select'
 let magnifierImg = null; // full-res <img> for the currently selected record, used by the lens
 let records = [];
@@ -2833,7 +2839,14 @@ function updateToolbarStatus(message = '') {
   const parts = [];
   if (excelFilterNames.size) parts.push(`XLSX ${excelFilterNames.size}`);
   if (sampleMode !== 'all') parts.push(`SAMPLE ${sampleMode}% / ${sampleIds.size}`);
-  toolbarStatus.textContent = message || parts.join(' · ');
+  toolbarStatus.title = message || parts.join(' · ') || 'GALLERY MASK';
+}
+
+function setGalleryMaskOnlyMode(value) {
+  galleryMaskOnlyMode = Boolean(value);
+  const input = document.getElementById('galleryMaskOnlyInput');
+  if (input) input.checked = galleryMaskOnlyMode;
+  redrawVisibleThumbs();
 }
 
 function updateClassSummary() {
@@ -4288,8 +4301,13 @@ async function drawThumbCanvas(record, canvas) {
   const w = bitmap.width, h = bitmap.height;
   canvas.width = w;
   canvas.height = h;
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  drawBoxes(ctx, record, w, h, record.imageSize?.width || w, record.imageSize?.height || h, false);
+  if (galleryMaskOnlyMode) {
+    ctx.fillStyle = '#05070d';
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.drawImage(bitmap, 0, 0, w, h);
+  }
+  drawBoxes(ctx, record, w, h, record.imageSize?.width || w, record.imageSize?.height || h, false, visibleClasses, galleryMaskOnlyMode);
 }
 
 // Downscaled, decoded-once thumbnail bitmap per file. createImageBitmap with
@@ -4664,7 +4682,7 @@ function archeryTrackColor(key, part) {
   return `hsl(${hue}, 75%, ${lightness}%)`;
 }
 
-function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet = visibleClasses) {
+function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet = visibleClasses, forceMaskOnly = false) {
   ctx.save();
   const scaleX = canvasW / imgW;
   const scaleY = canvasH / imgH;
@@ -4682,7 +4700,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
     const isFilteredClass = classFilter !== '__all__' && box.className === classFilter;
     const isDimmedByFilter = classFilter !== '__all__' && box.className !== classFilter;
-    const isMaskOnlyPolygon = isMain && maskOnlyMode && mainViewMode === 'overlay' && box.type === 'polygon';
+    const isMaskOnlyPolygon = (forceMaskOnly || (isMain && maskOnlyMode && mainViewMode === 'overlay')) && box.type === 'polygon';
     ctx.globalAlpha = isDimmedByFilter ? 0.035 : (isMaskOnlyPolygon ? 1 : (box.type === 'polygon' ? 0.85 : (isMain ? 0.08 : 0.14)));
     ctx.fillStyle = color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
@@ -7388,8 +7406,10 @@ function resetAll() {
   reviewableTotal = 0;
   mainViewMode = 'overlay';
   maskOnlyMode = false;
+  galleryMaskOnlyMode = false;
   magnifierImg = null;
   updateMainViewToggleBtn();
+  setGalleryMaskOnlyMode(false);
   objectUrlCache.forEach(url => URL.revokeObjectURL(url));
   objectUrlCache.clear();
   if (galleryObserver) galleryObserver.disconnect();
