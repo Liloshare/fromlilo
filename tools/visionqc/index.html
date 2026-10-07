@@ -3117,7 +3117,12 @@ async function buildCocoAnnotationMap(files) {
         const key = normalizedAnnotationKey(image.file_name || '');
         if (!grouped.has(key)) grouped.set(key, { file, image, boxes: [] });
         const className = categoryById.get(ann.category_id) || String(ann.category_id);
-        grouped.get(key).boxes.push(...cocoAnnotationShapes(ann, className, idx + 1, image.width, image.height));
+        const parsed = cocoAnnotationShapes(ann, className, idx + 1, image.width, image.height);
+        grouped.get(key).boxes.push(...parsed);
+        if (parsed.unsupported?.length) {
+          const entry = grouped.get(key);
+          entry.parseError = [entry.parseError, ...parsed.unsupported].filter(Boolean).join(' / ');
+        }
       });
     } catch (error) {
       console.warn('coco_file_parse_failed', file.name, error);
@@ -3193,14 +3198,21 @@ function readKeypointScore(ann, point) {
 
 function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
   const shapes = [];
+  const unsupported = [];
+  const hasSegmentationValue = ann.segmentation !== undefined && ann.segmentation !== null && ann.segmentation !== '';
+  if (hasSegmentationValue && !Array.isArray(ann.segmentation)) {
+    unsupported.push(`COCO row ${row} unsupported segmentation`);
+  }
   const rawSegmentation = Array.isArray(ann.segmentation) ? ann.segmentation : [];
-  const segmentations = rawSegmentation.length && typeof rawSegmentation[0] === 'number'
-    ? [rawSegmentation]
-    : rawSegmentation;
-  segmentations.forEach(points => {
-    if (!Array.isArray(points) || points.length < 6) return;
+  const segmentations = rawSegmentation.length && typeof rawSegmentation[0] === 'number' ? [rawSegmentation] : rawSegmentation;
+  segmentations.forEach((points, segIdx) => {
+    if (!Array.isArray(points) || points.length < 6) {
+      unsupported.push(`COCO row ${row} invalid polygon ${segIdx + 1}`);
+      return;
+    }
     shapes.push(makePolygonShape(className, pointsToPairs(points), row, imgW, imgH));
   });
+  if (Array.isArray(ann.keypoints) && ann.keypoints.length) unsupported.push(`COCO row ${row} unsupported keypoints`);
   if (Array.isArray(ann.bbox) && ann.bbox.length >= 4) {
     const [x, y, w, h] = ann.bbox.map(Number);
     if ([x, y, w, h].every(Number.isFinite) && imgW && imgH) {
@@ -3216,6 +3228,7 @@ function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
       });
     }
   }
+  shapes.unsupported = unsupported;
   return shapes;
 }
 
@@ -3229,6 +3242,7 @@ async function buildLabelMeAnnotationMap(files) {
       const key = normalizedStem(data.imagePath || file.name);
       const imgW = Number(data.imageWidth) || null;
       const imgH = Number(data.imageHeight) || null;
+      const unsupported = [];
       const boxes = (data.shapes || []).flatMap((shape, idx) => {
         const className = String(shape.label || 'LABEL');
         classNames.push(className);
@@ -3241,9 +3255,10 @@ async function buildLabelMeAnnotationMap(files) {
         if (shape.shape_type === 'point' && Array.isArray(shape.points) && shape.points.length >= 1) {
           return [makeKeypointShape(className, shape.points[0], idx + 1, imgW, imgH)];
         }
+        if (shape.points?.length || shape.shape_type) unsupported.push(`LabelMe shape ${idx + 1} unsupported ${shape.shape_type || 'shape'}`);
         return [];
       }).filter(Boolean);
-      grouped.set(key, { file, image: { file_name: data.imagePath, width: imgW, height: imgH }, boxes });
+      grouped.set(key, { file, image: { file_name: data.imagePath, width: imgW, height: imgH }, boxes, parseError: unsupported.join(' / ') });
     } catch (error) {
       console.warn('labelme_file_parse_failed', file.name, error);
       failedFiles.push(file.name);
@@ -3810,6 +3825,7 @@ async function parseRecord(record) {
     if (!entry) return;
     record.boxes = entry.boxes || [];
     record.labelFile = entry.file || record.labelFile;
+    if (entry.parseError) record.parseError = entry.parseError;
     if (entry.image?.width && entry.image?.height) record.imageSize = { width: entry.image.width, height: entry.image.height };
     return;
   }
@@ -3831,7 +3847,7 @@ function renderStats() {
   const matched = scoped.filter(r => r.status === 'matched').length;
   const zero = scoped.filter(r => r.status === 'matched' && r.boxes.length === 0).length;
   const duplicate = scoped.filter(r => r.status === 'matched' && isDuplicate(r)).length;
-  const unmatch = scoped.filter(r => r.status === 'missing-image' || r.status === 'missing-label').length;
+  const unmatch = scoped.filter(r => isUnmatchRecord(r)).length;
   const reviewed = scoped.filter(r => r.status === 'matched' && reviewedSet.has(r.id) && !issueMap.has(r.id)).length;
   const issueCount = Array.from(issueMap.values()).filter(issue => scopedIds.has(issue.id) && hasErrorIssue(issue)).length;
   const remain = scoped.filter(r => isRemainRecord(r)).length;
@@ -3961,7 +3977,7 @@ function filteredRecords() {
   const f = galleryFilter;
   return scopedRecords().filter(r => {
     if (f === 'unmatch') {
-      if (r.status !== 'missing-image' && r.status !== 'missing-label') return false;
+      if (!isUnmatchRecord(r)) return false;
     } else if (f === 'all') {
       if (!r.imageFile && annotationFormat === 'yolo') return false;
       if (r.status === 'matched' && r.boxes.length === 0) return false;
@@ -3988,6 +4004,10 @@ function filteredRecords() {
     if (f !== 'unmatch' && classFilter !== '__all__' && !r.boxes.some(b => b.className === classFilter)) return false;
     return true;
   });
+}
+
+function isUnmatchRecord(record) {
+  return record.status === 'missing-image' || record.status === 'missing-label' || Boolean(record.parseError);
 }
 
 function thumbClassName(record) {
