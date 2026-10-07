@@ -4682,7 +4682,8 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     const rect = shapeRect(box, imgW, imgH, scaleX, scaleY);
     const isFilteredClass = classFilter !== '__all__' && box.className === classFilter;
     const isDimmedByFilter = classFilter !== '__all__' && box.className !== classFilter;
-    ctx.globalAlpha = isDimmedByFilter ? 0.035 : (box.type === 'polygon' ? 0.2 : (isMain ? 0.08 : 0.14));
+    const isMaskOnlyPolygon = isMain && maskOnlyMode && mainViewMode === 'overlay' && box.type === 'polygon';
+    ctx.globalAlpha = isDimmedByFilter ? 0.035 : (isMaskOnlyPolygon ? 1 : (box.type === 'polygon' ? 0.38 : (isMain ? 0.08 : 0.14)));
     ctx.fillStyle = color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.fill();
@@ -4692,6 +4693,11 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
       ctx.fill();
     }
     else ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    if (isMaskOnlyPolygon) {
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur = 0;
+      return;
+    }
     ctx.globalAlpha = isDimmedByFilter ? 0.32 : 1;
     const canShowSelection = record === records[currentIndex];
     const isActive = canShowSelection && (idx === activeBoxIndex || selectedBoxIndices.has(idx));
@@ -5432,10 +5438,15 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     ctx.strokeStyle = isActive ? '#ffffff' : color;
     drawLensShape(ctx, box, sx, sy, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') {
-      ctx.globalAlpha = 0.2;
+      const isMaskOnlyPolygon = maskOnlyMode && mainViewMode === 'overlay';
+      ctx.globalAlpha = isMaskOnlyPolygon ? 1 : 0.38;
       ctx.fillStyle = color;
       ctx.fill();
       ctx.globalAlpha = 1;
+      if (isMaskOnlyPolygon) {
+        ctx.shadowBlur = 0;
+        return;
+      }
       ctx.stroke();
     }
     else if (box.type === 'keypoint') {
