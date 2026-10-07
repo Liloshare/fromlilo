@@ -14,7 +14,7 @@ Rules for future edits:
 
 Current behavior:
 
-- COCO bbox and polygon are both pushed into `record.boxes` when both values exist.
+- COCO polygon is preferred for display when both `bbox` and polygon `segmentation` exist. Bbox is used as a fallback only when no polygon can be rendered.
 - COCO flat-array segmentation is treated as one polygon.
 - Unsupported COCO segmentation/keypoints and unsupported LabelMe shapes set `record.parseError`.
 - `record.parseError` is included in the UNMATCH stat/filter.

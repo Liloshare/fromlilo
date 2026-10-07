@@ -3216,7 +3216,7 @@ function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
   });
   if (hasSegmentationValue && !segmentations.length && Array.isArray(ann.segmentation)) unsupported.push(`COCO row ${row} unsupported segmentation`);
   if (Array.isArray(ann.keypoints) && ann.keypoints.length) unsupported.push(`COCO row ${row} unsupported keypoints`);
-  if (Array.isArray(ann.bbox) && ann.bbox.length >= 4) {
+  if (!shapes.length && Array.isArray(ann.bbox) && ann.bbox.length >= 4) {
     const [x, y, w, h] = ann.bbox.map(Number);
     if ([x, y, w, h].every(Number.isFinite) && imgW && imgH) {
       shapes.push({
