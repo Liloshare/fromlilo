@@ -4683,7 +4683,7 @@ function drawBoxes(ctx, record, canvasW, canvasH, imgW, imgH, isMain, classSet =
     const isFilteredClass = classFilter !== '__all__' && box.className === classFilter;
     const isDimmedByFilter = classFilter !== '__all__' && box.className !== classFilter;
     const isMaskOnlyPolygon = isMain && maskOnlyMode && mainViewMode === 'overlay' && box.type === 'polygon';
-    ctx.globalAlpha = isDimmedByFilter ? 0.035 : (isMaskOnlyPolygon ? 1 : (box.type === 'polygon' ? 0.38 : (isMain ? 0.08 : 0.14)));
+    ctx.globalAlpha = isDimmedByFilter ? 0.035 : (isMaskOnlyPolygon ? 1 : (box.type === 'polygon' ? 0.85 : (isMain ? 0.08 : 0.14)));
     ctx.fillStyle = color;
     drawShapePath(ctx, box, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') ctx.fill();
@@ -5439,7 +5439,7 @@ function drawLensBoxes(ctx, record, sx, sy, cropW, cropH, imgW, imgH) {
     drawLensShape(ctx, box, sx, sy, imgW, imgH, scaleX, scaleY);
     if (box.type === 'polygon') {
       const isMaskOnlyPolygon = maskOnlyMode && mainViewMode === 'overlay';
-      ctx.globalAlpha = isMaskOnlyPolygon ? 1 : 0.38;
+      ctx.globalAlpha = isMaskOnlyPolygon ? 1 : 0.85;
       ctx.fillStyle = color;
       ctx.fill();
       ctx.globalAlpha = 1;
