@@ -3193,12 +3193,15 @@ function readKeypointScore(ann, point) {
 
 function cocoAnnotationShapes(ann, className, row, imgW, imgH) {
   const shapes = [];
-  const segmentations = Array.isArray(ann.segmentation) ? ann.segmentation : [];
+  const rawSegmentation = Array.isArray(ann.segmentation) ? ann.segmentation : [];
+  const segmentations = rawSegmentation.length && typeof rawSegmentation[0] === 'number'
+    ? [rawSegmentation]
+    : rawSegmentation;
   segmentations.forEach(points => {
     if (!Array.isArray(points) || points.length < 6) return;
     shapes.push(makePolygonShape(className, pointsToPairs(points), row, imgW, imgH));
   });
-  if (!shapes.length && Array.isArray(ann.bbox) && ann.bbox.length >= 4) {
+  if (Array.isArray(ann.bbox) && ann.bbox.length >= 4) {
     const [x, y, w, h] = ann.bbox.map(Number);
     if ([x, y, w, h].every(Number.isFinite) && imgW && imgH) {
       shapes.push({
