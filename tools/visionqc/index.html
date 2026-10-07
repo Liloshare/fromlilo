@@ -6447,6 +6447,7 @@ let feedbackDocActive = -1;
 let feedbackMiniTool = 'arrow';
 let feedbackMiniDraft = null;
 let feedbackDrawerCollapsed = true;
+let feedbackDocCanvasObserver = null;
 const FEEDBACK_TOOL_COLORS = {
   rect: '#ff2d55',
   circle: '#2563eb',
@@ -6563,6 +6564,10 @@ function renderFeedbackDrawer() {
   setFeedbackMiniTool(feedbackMiniTool);
   const wrap = document.getElementById('feedbackMiniPages');
   if (!wrap) return;
+  if (feedbackDocCanvasObserver) {
+    feedbackDocCanvasObserver.disconnect();
+    feedbackDocCanvasObserver = null;
+  }
   const rows = displayOrderedFeedbackDocPages();
   wrap.innerHTML = rows.length ? rows.map(({ page, index }) => `
     <div class="feedback-mini-page ${index === feedbackDocActive ? 'active' : ''}" data-doc-index="${index}">
@@ -6584,7 +6589,7 @@ function renderFeedbackDrawer() {
   wrap.querySelectorAll('[data-doc-index]').forEach(card => {
     const index = Number(card.dataset.docIndex);
     card.addEventListener('click', event => {
-      if (event.target.matches('input, textarea, button, canvas')) return;
+      if (event.target.matches('input, textarea, button')) return;
       feedbackDocActive = index;
       renderFeedbackDrawer();
     });
@@ -6605,9 +6610,25 @@ function renderFeedbackDrawer() {
       renderFeedbackDrawer();
     });
   });
+  feedbackDocCanvasObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const canvas = entry.target;
+      if (!canvas.dataset.rendered) {
+        canvas.dataset.rendered = '1';
+        redrawFeedbackDocCanvas(canvas);
+      }
+      feedbackDocCanvasObserver?.unobserve(canvas);
+    });
+  }, { root: wrap.closest('.feedback-drawer-body'), rootMargin: '280px 0px' });
   wrap.querySelectorAll('[data-doc-canvas]').forEach(canvas => {
     attachFeedbackDocCanvasEvents(canvas);
-    redrawFeedbackDocCanvas(canvas);
+    if (Number(canvas.dataset.docCanvas) === feedbackDocActive) {
+      canvas.dataset.rendered = '1';
+      redrawFeedbackDocCanvas(canvas);
+    } else {
+      feedbackDocCanvasObserver.observe(canvas);
+    }
   });
 }
 
@@ -6620,6 +6641,18 @@ async function redrawFeedbackDocCanvas(canvas) {
   canvas.height = 540;
   const ctx = canvas.getContext('2d');
   canvas._imgRect = await drawFeedbackDocImage(ctx, record, page, canvas.width, canvas.height, true);
+}
+
+function scheduleFeedbackDocCanvasRedraw(canvas, afterDraw) {
+  canvas._redrawAfter = afterDraw;
+  if (canvas._redrawFrame) return;
+  canvas._redrawFrame = requestAnimationFrame(async () => {
+    canvas._redrawFrame = 0;
+    await redrawFeedbackDocCanvas(canvas);
+    const fn = canvas._redrawAfter;
+    canvas._redrawAfter = null;
+    if (fn) fn();
+  });
 }
 
 async function drawFeedbackDocImage(ctx, record, page, canvasW, canvasH, withHandles = false) {
@@ -6709,7 +6742,11 @@ function attachFeedbackDocCanvasEvents(canvas) {
     const point = canvasPoint(event, canvas);
     feedbackMiniDraft.shape.x2 = point.x;
     feedbackMiniDraft.shape.y2 = point.y;
-    redrawFeedbackDocCanvas(canvas).then(() => drawFeedbackShape(canvas.getContext('2d'), feedbackMiniDraft.shape, canvas.width, canvas.height, true));
+    scheduleFeedbackDocCanvasRedraw(canvas, () => {
+      if (feedbackMiniDraft?.canvas === canvas) {
+        drawFeedbackShape(canvas.getContext('2d'), feedbackMiniDraft.shape, canvas.width, canvas.height, true);
+      }
+    });
   });
   canvas.addEventListener('pointerup', event => {
     if (!feedbackMiniDraft || feedbackMiniDraft.canvas !== canvas) return;
