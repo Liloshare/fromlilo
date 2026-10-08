@@ -15,6 +15,7 @@ Rules for future edits:
 Current behavior:
 
 - COCO polygon is preferred for display when both `bbox` and polygon `segmentation` exist. Bbox is used as a fallback only when no polygon can be rendered.
+- If a separate bbox shape tightly wraps a polygon of the same class, Vision QC suppresses that wrapper bbox in the display list so polygon review stays polygon-only.
 - COCO flat-array segmentation is treated as one polygon.
 - Unsupported COCO segmentation/keypoints and unsupported LabelMe shapes set `record.parseError`.
 - `record.parseError` is included in the UNMATCH stat/filter.

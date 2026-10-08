@@ -3836,7 +3836,7 @@ async function parseRecord(record) {
   if (annotationFormat !== 'yolo') {
     const entry = annotationMap.get(record.annotationKey || record.id);
     if (!entry) return;
-    record.boxes = entry.boxes || [];
+    record.boxes = prunePolygonWrapperBoxes(entry.boxes || []);
     record.labelFile = entry.file || record.labelFile;
     if (entry.parseError) record.parseError = entry.parseError;
     if (entry.image?.width && entry.image?.height) record.imageSize = { width: entry.image.width, height: entry.image.height };
@@ -3852,6 +3852,39 @@ async function parseRecord(record) {
   const { boxes, parseError } = await parseBoxesFromFile(record.labelFile);
   record.boxes = boxes;
   if (parseError) record.parseError = parseError;
+}
+
+function prunePolygonWrapperBoxes(boxes) {
+  const polygons = boxes.filter(box => box.type === 'polygon' && box.points?.length);
+  if (!polygons.length) return boxes;
+  return boxes.filter(box => {
+    if (box.type === 'polygon' || box.type === 'keypoint') return true;
+    return !polygons.some(poly => (
+      poly.className === box.className &&
+      rectSimilarity(box, poly) >= 0.86 &&
+      rectContains(box, poly, 0.015)
+    ));
+  });
+}
+
+function rectSimilarity(a, b) {
+  const ax1 = a.xc - a.bw / 2, ay1 = a.yc - a.bh / 2, ax2 = a.xc + a.bw / 2, ay2 = a.yc + a.bh / 2;
+  const bx1 = b.xc - b.bw / 2, by1 = b.yc - b.bh / 2, bx2 = b.xc + b.bw / 2, by2 = b.yc + b.bh / 2;
+  const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(ax1, bx1));
+  const iy = Math.max(0, Math.min(ay2, by2) - Math.max(ay1, by1));
+  const inter = ix * iy;
+  const areaA = Math.max(0, a.bw) * Math.max(0, a.bh);
+  const areaB = Math.max(0, b.bw) * Math.max(0, b.bh);
+  const union = areaA + areaB - inter;
+  return union ? inter / union : 0;
+}
+
+function rectContains(outer, inner, tolerance = 0) {
+  const ox1 = outer.xc - outer.bw / 2 - tolerance, oy1 = outer.yc - outer.bh / 2 - tolerance;
+  const ox2 = outer.xc + outer.bw / 2 + tolerance, oy2 = outer.yc + outer.bh / 2 + tolerance;
+  const ix1 = inner.xc - inner.bw / 2, iy1 = inner.yc - inner.bh / 2;
+  const ix2 = inner.xc + inner.bw / 2, iy2 = inner.yc + inner.bh / 2;
+  return ox1 <= ix1 && oy1 <= iy1 && ox2 >= ix2 && oy2 >= iy2;
 }
 
 function renderStats() {
