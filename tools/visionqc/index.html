@@ -557,6 +557,7 @@
       font-size: 11px;
     }
     .canvas-frame {
+      isolation: isolate;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       overflow: auto;
@@ -573,6 +574,24 @@
       display: block;
       cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 15 15'%3E%3Crect x='0.5' y='0.5' width='14' height='14' fill='none' stroke='%23000000' stroke-width='1'/%3E%3Crect x='1.5' y='1.5' width='12' height='12' fill='none' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E") 7 7, crosshair;
     }
+    #boxSizeLayer { position: absolute; pointer-events: none; z-index: 5; overflow: hidden; }
+    .box-size-reference {
+      position: absolute; box-sizing: border-box; border: 1px dashed #fff;
+      background: transparent; pointer-events: auto; cursor: move; touch-action: none;
+      outline: 1px dashed #111; outline-offset: 1px;
+    }
+    .box-size-caption {
+      position: absolute; left: 0; top: 0; padding: 2px 4px;
+      background: #111; color: #fff; font: 10px/1.3 sans-serif;
+      white-space: nowrap; pointer-events: none;
+      transform: translateY(-100%);
+    }
+    .box-size-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .box-size-fields label { display: grid; gap: 4px; min-width: 0; }
+    .box-size-fields input { width: 100%; min-width: 0; }
+    .box-size-object { grid-column: 1 / -1; }
+    .box-size-saved { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; }
+    .box-size-saved span { flex: 1; overflow-wrap: anywhere; }
     .canvas-bezel {
       position: fixed;
       top: 10px;
@@ -711,8 +730,9 @@
       padding-right: 4px;
     }
     @media (max-width: 900px) {
-      .panel.viewer-fullscreen .viewer { grid-template-columns: 1fr; grid-template-rows: 1fr auto; overflow: auto; }
-      .panel.viewer-fullscreen .canvas-frame { max-height: 46vh; }
+      .panel.viewer-fullscreen .viewer { grid-template-columns: 1fr; grid-template-rows: 46vh auto auto; overflow: auto; }
+      .panel.viewer-fullscreen .canvas-frame { min-height: 0; max-height: 46vh; }
+      .panel.viewer-fullscreen .viewer-side { height: auto; overflow: visible; }
       .canvas-frame { min-height: 52vh; max-height: 62vh; }
     }
 
@@ -1999,6 +2019,7 @@
               <span>(f)</span>
             </div>
             <canvas id="mainCanvas"></canvas>
+            <div id="boxSizeLayer"></div>
             <div class="magnifier hidden" id="magnifier"><canvas id="magnifierCanvas"></canvas></div>
             <div class="issue-popover hidden" id="issuePopover"></div>
           </div>
@@ -2025,6 +2046,16 @@
             <div class="field">
               <label>REPORT</label>
               <div class="issue-columns" id="reportChecks"></div>
+              <form id="boxSizeForm" class="hidden" onsubmit="event.preventDefault(); saveBoxSizeReference()">
+                <div class="box-size-fields">
+                  <label class="box-size-object">OBJECT<input id="boxSizeObject" type="text" list="boxSizeClasses" required></label>
+                  <datalist id="boxSizeClasses"></datalist>
+                  <label>WIDTH (px)<input id="boxSizeWidth" type="number" min="1" step="1" required></label>
+                  <label>HEIGHT (px)<input id="boxSizeHeight" type="number" min="1" step="1" required></label>
+                </div>
+                <button type="submit">SAVE</button>
+                <div id="boxSizeSaved"></div>
+              </form>
             </div>
             <div class="field hidden" id="commentField">
               <label>COMMENT</label>
@@ -2259,6 +2290,7 @@ let classFilter = '__all__'; // '__all__' or a single class name — which image
 let reviewableTotal = 0; // count of matched+has-boxes records, for the stable #order badge
 let mainViewMode = 'overlay'; // 'overlay' | 'image' — single-image review canvas only
 let maskOnlyMode = false;
+let boxSizeReferences = [];
 let galleryMaskOnlyMode = false;
 let reviewToolMode = 'select'; // 'magnifier' | 'select'
 let magnifierImg = null; // full-res <img> for the currently selected record, used by the lens
@@ -4512,6 +4544,7 @@ function toggleReviewMode() {
 }
 
 document.addEventListener('keydown', (e) => {
+  if (e.target.closest?.('#boxSizeForm')) return;
   const tag = document.activeElement ? document.activeElement.tagName : '';
   const isTyping = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable;
   if (e.key === 'Escape') { hideIssuePopup(); closeConsistencyBoard(); closeCompareView(); exitReviewMode(); return; }
@@ -4546,6 +4579,7 @@ async function renderCurrent() {
   const boxSummary = document.getElementById('boxSummary');
   if (!record) {
     canvas.width = 1; canvas.height = 1;
+    renderBoxSizeReferences();
     boxList.innerHTML = '';
     if (boxSummary) boxSummary.textContent = '';
     document.getElementById('metaTable').innerHTML = '<div class="meta-row"><div class="meta-key">OUTPUT</div><div class="meta-val">EMPTY</div></div>';
@@ -4668,6 +4702,8 @@ async function renderCanvas(canvas, record, maxWidth, isMain = false, maxHeight 
   const h = Math.max(1, Math.round(img.naturalHeight * scale));
   canvas.width = w;
   canvas.height = h;
+
+  if (isMain) requestAnimationFrame(renderBoxSizeReferences);
 
   const isMaskOnly = isMain && mainViewMode === 'overlay' && maskOnlyMode;
   if (isMaskOnly) {
@@ -5664,11 +5700,127 @@ function buildIssueChecks() {
   reportWrap.innerHTML = `
     <div class="issue-column">
       ${issueButtonHtml('checking', 'Checking', 8)}
+      <button type="button" class="check" id="boxSizeBtn" onclick="toggleBoxSizeForm()">Box size</button>
     </div>
   `;
   renderIssuePopover();
 }
 buildIssueChecks();
+
+function toggleBoxSizeForm() {
+  const form = document.getElementById('boxSizeForm');
+  form.classList.toggle('hidden');
+  document.getElementById('boxSizeBtn')?.classList.toggle('active', !form.classList.contains('hidden'));
+  document.getElementById('boxSizeClasses').innerHTML = classes.map(name => `<option value="${escapeHtml(name)}"></option>`).join('');
+  renderSavedBoxSizes();
+}
+
+function saveBoxSizeReference() {
+  const form = document.getElementById('boxSizeForm');
+  if (!form.reportValidity()) return;
+  const name = document.getElementById('boxSizeObject').value.trim();
+  const width = Number(document.getElementById('boxSizeWidth').value);
+  const height = Number(document.getElementById('boxSizeHeight').value);
+  if (!name || !Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) return;
+  const existing = boxSizeReferences.find(item => item.name === name);
+  if (existing) Object.assign(existing, { width, height });
+  else boxSizeReferences.push({ name, width, height, x: 0.02 + (boxSizeReferences.length % 5) * 0.14, y: 0.1 + (boxSizeReferences.length % 4) * 0.14 });
+  renderSavedBoxSizes();
+  renderBoxSizeReferences();
+}
+
+function renderSavedBoxSizes() {
+  const list = document.getElementById('boxSizeSaved');
+  list.replaceChildren();
+  boxSizeReferences.forEach(reference => {
+    const row = document.createElement('div');
+    row.className = 'box-size-saved';
+    const text = document.createElement('span');
+    text.textContent = `${reference.name} ${reference.width} x ${reference.height} px`;
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.textContent = 'EDIT';
+    edit.onclick = () => {
+      document.getElementById('boxSizeObject').value = reference.name;
+      document.getElementById('boxSizeWidth').value = reference.width;
+      document.getElementById('boxSizeHeight').value = reference.height;
+    };
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = '×';
+    remove.title = `DELETE ${reference.name}`;
+    remove.onclick = () => {
+      boxSizeReferences = boxSizeReferences.filter(item => item !== reference);
+      renderSavedBoxSizes();
+      renderBoxSizeReferences();
+    };
+    row.append(text, edit, remove);
+    list.append(row);
+  });
+}
+
+function renderBoxSizeReferences() {
+  const layer = document.getElementById('boxSizeLayer');
+  const canvas = document.getElementById('mainCanvas');
+  const frame = document.getElementById('canvasFrame');
+  const record = records[currentIndex];
+  layer.replaceChildren();
+  if (!record?.imageFile || !record.imageSize || canvas.width <= 1) return;
+  const rect = canvas.getBoundingClientRect();
+  const frameRect = frame.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  Object.assign(layer.style, {
+    left: `${rect.left - frameRect.left - frame.clientLeft + frame.scrollLeft}px`,
+    top: `${rect.top - frameRect.top - frame.clientTop + frame.scrollTop}px`,
+    width: `${rect.width}px`, height: `${rect.height}px`
+  });
+  boxSizeReferences.forEach(reference => {
+    const box = document.createElement('div');
+    box.className = 'box-size-reference';
+    const width = reference.width / record.imageSize.width * rect.width;
+    const height = reference.height / record.imageSize.height * rect.height;
+    const maxX = Math.max(0, rect.width - width);
+    const maxY = Math.max(0, rect.height - height);
+    let left = Math.min(maxX, Math.max(0, reference.x * rect.width));
+    let top = Math.min(maxY, Math.max(20, reference.y * rect.height));
+    Object.assign(box.style, { width: `${width}px`, height: `${height}px`, left: `${left}px`, top: `${top}px` });
+    const caption = document.createElement('span');
+    caption.className = 'box-size-caption';
+    caption.textContent = `${reference.name} ${reference.width} × ${reference.height} px`;
+    box.append(caption);
+    let drag = null;
+    box.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      document.getElementById('magnifier')?.classList.add('hidden');
+      drag = { x: event.clientX, y: event.clientY, left, top };
+      box.setPointerCapture(event.pointerId);
+    });
+    box.addEventListener('pointermove', event => {
+      if (!drag) return;
+      event.stopPropagation();
+      left = Math.min(maxX, Math.max(0, drag.left + event.clientX - drag.x));
+      top = Math.min(maxY, Math.max(0, drag.top + event.clientY - drag.y));
+      reference.x = left / rect.width;
+      reference.y = top / rect.height;
+      box.style.left = `${left}px`;
+      box.style.top = `${top}px`;
+    });
+    const finish = event => {
+      drag = null;
+      if (box.hasPointerCapture(event.pointerId)) box.releasePointerCapture(event.pointerId);
+    };
+    box.addEventListener('pointerup', finish);
+    box.addEventListener('pointercancel', finish);
+    box.addEventListener('lostpointercapture', () => { drag = null; });
+    box.addEventListener('click', event => event.stopPropagation());
+    box.addEventListener('dblclick', event => event.stopPropagation());
+    layer.append(box);
+  });
+}
+
+new ResizeObserver(renderBoxSizeReferences).observe(document.getElementById('mainCanvas'));
 
 function issueButtonHtml(value, label, shortcut) {
   const id = value === 'missing' ? ' id="missingIssueBtn"' : value === 'checking' ? ' id="checkingIssueBtn"' : '';
